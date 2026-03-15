@@ -157,11 +157,12 @@ async function submitGame(){
     pitchers:log
   }
   await fetch(API,{
-    method:"POST",
-    mode:"no-cors",
-    headers:{"Content-Type":"text/plain"},
-    body:JSON.stringify(data)
-  })
+  method:"POST",
+  headers:{
+    "Content-Type":"application/json"
+  },
+  body:JSON.stringify(data)
+})
   alert("Game Submitted")
   log=[]
   update()
