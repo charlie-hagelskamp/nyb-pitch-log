@@ -155,11 +155,18 @@ button:disabled{
 .status-good{
   color:green;
   font-weight:bold;
+  margin-bottom:6px;
 }
 
 .status-bad{
   color:red;
   font-weight:bold;
+  margin-bottom:6px;
+}
+
+.status-neutral{
+  color:#333;
+  margin-bottom:6px;
 }
 </style>
 </head>
@@ -448,12 +455,22 @@ function loadTeamStatus(team){
       const today = new Date();
       today.setHours(0,0,0,0);
 
-      let statusHTML = "<h3>Pitching Status</h3>";
+      let statusHTML = "<h3>Full Team Pitching Status</h3>";
       let eligibleHTML = "<h3>Who Can Pitch Today</h3>";
       let anyEligible = false;
 
-      if(!Array.isArray(data) || data.length === 0){
-        statusHTML += "No pitching records found for this team.";
+      const latestByName = {};
+
+      if(Array.isArray(data)){
+        data.forEach(p=>{
+          latestByName[p.name] = p;
+        });
+      }
+
+      const teamRoster = roster[team] || [];
+
+      if(teamRoster.length === 0){
+        statusHTML += "No roster found for this team.";
         eligibleHTML += "No pitchers eligible today";
         document.getElementById("teamStatus").innerHTML = statusHTML;
         document.getElementById("eligibleToday").innerHTML = eligibleHTML;
@@ -461,17 +478,25 @@ function loadTeamStatus(team){
         return;
       }
 
-      data.forEach(p=>{
-        const eligibleDate = new Date(p.eligibleDate + "T00:00:00");
+      teamRoster.forEach(playerName=>{
+        const record = latestByName[playerName];
+
+        if(!record){
+          statusHTML += `<div class="status-good">🟢 ${playerName} — Eligible today (no pitching history entered)</div>`;
+          eligibleHTML += `<div class="status-good">🟢 ${playerName}</div>`;
+          anyEligible = true;
+          return;
+        }
+
+        const eligibleDate = new Date(record.eligibleDate + "T00:00:00");
         const eligible = eligibleDate <= today;
 
-        statusHTML += eligible
-          ? `<div class="status-good">🟢 ${p.name} — Eligible today</div>`
-          : `<div class="status-bad">🔴 ${p.name} — Next eligible ${eligibleDate.toLocaleDateString()}</div>`;
-
         if(eligible){
-          eligibleHTML += `<div class="status-good">🟢 ${p.name}</div>`;
+          statusHTML += `<div class="status-good">🟢 ${playerName} — Eligible today</div>`;
+          eligibleHTML += `<div class="status-good">🟢 ${playerName}</div>`;
           anyEligible = true;
+        } else {
+          statusHTML += `<div class="status-bad">🔴 ${playerName} — Next eligible ${eligibleDate.toLocaleDateString()}</div>`;
         }
       });
 
