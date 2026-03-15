@@ -1,50 +1,55 @@
 <!DOCTYPE html>
 <html>
 <head>
-
 <meta name="viewport" content="width=device-width,initial-scale=1">
-
 <title>Noblesville Travel Baseball Pitch Log</title>
-
 <style>
-
 body{
-font-family:Arial;
-max-width:600px;
-margin:auto;
-padding:20px;
+  font-family:Arial;
+  max-width:600px;
+  margin:auto;
+  padding:20px;
 }
 
 .logo{
-width:120px;
-display:block;
-margin:auto;
+  width:120px;
+  display:block;
+  margin:auto;
 }
 
 h1{
-text-align:center;
+  text-align:center;
 }
 
 button{
-width:100%;
-padding:12px;
-margin:6px 0;
-font-size:16px;
+  width:100%;
+  padding:12px;
+  margin:6px 0;
+  font-size:16px;
+  cursor:pointer;
 }
 
 .player{
-background:#000;
-color:#fff;
+  background:#ccc; /* lighter background */
+  color:#000; /* black font */
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
 }
 
+.player.added{
+  background:#a6e3a1; /* light green to indicate added */
+}
+
+.checkmark{
+  font-weight:bold;
+  margin-left:8px;
+}
 </style>
-
 </head>
-
 <body>
 
 <img src="DC5hbQVQ.jpg" class="logo">
-
 <h1>Noblesville Travel Baseball</h1>
 
 <h2>Game Pitch Log</h2>
@@ -53,7 +58,9 @@ Date<br>
 <input type="date" id="date"><br><br>
 
 Team<br>
-<select id="team"></select><br><br>
+<select id="team">
+  <option value="">Select a team</option>
+</select><br><br>
 
 Opponent<br>
 <input id="opponent"><br><br>
@@ -61,95 +68,104 @@ Opponent<br>
 <div id="pitchers"></div>
 
 <h3>Pitch Log</h3>
-
 <div id="log"></div>
 
 Game Notes<br>
-
 <textarea id="notes" rows="4" style="width:100%"></textarea>
-
 <br><br>
 
 <button onclick="submitGame()">Submit</button>
 
 <script>
-
 const API="https://script.google.com/macros/s/AKfycbwdblCmYSuNrFK_Gk-pQIB4fOKncnpvQ24cgaCUfWcVtGXYieMs16O47MvAoja0FPfL/exec";
 
 let roster={}
 let log=[]
 
 async function load(){
+  const res=await fetch("roster.json")
+  roster=await res.json()
 
-const res=await fetch("roster.json")
-roster=await res.json()
+  const teamSelect=document.getElementById("team")
 
-const team=document.getElementById("team")
+  Object.keys(roster).forEach(t=>{
+    let opt=document.createElement("option")
+    opt.value=t
+    opt.text=t
+    teamSelect.appendChild(opt)
+  })
 
-Object.keys(roster).forEach(t=>{
-
-let opt=document.createElement("option")
-opt.value=t
-opt.text=t
-
-team.appendChild(opt)
-
-})
-
-team.onchange=render
-
-render()
-
+  teamSelect.onchange=render
+  render()
 }
 
 function render(){
+  const team=document.getElementById("team").value
+  const div=document.getElementById("pitchers")
+  div.innerHTML=""
 
-const team=document.getElementById("team").value
-const div=document.getElementById("pitchers")
+  if(!team || team.startsWith("7U")) return
 
-div.innerHTML=""
+  roster[team].forEach(p=>{
+    let btn=document.createElement("button")
+    btn.className="player"
+    btn.innerHTML=p + '<span class="checkmark"></span>'
 
-if(team.startsWith("7U")) return
+    btn.onclick=()=>addOrRemovePitcher(p, btn)
 
-roster[team].forEach(p=>{
-
-let btn=document.createElement("button")
-
-btn.className="player"
-btn.innerText=p
-
-btn.onclick=()=>{
-
-let pitches=prompt("Pitch count for "+p)
-
-if(!pitches) return
-
-log.push({name:p,pitches:Number(pitches)})
-
-update()
-
+    div.appendChild(btn)
+  })
 }
 
-div.appendChild(btn)
+function addOrRemovePitcher(name, btn){
+  // If already in log, remove
+  const index = log.findIndex(l=>l.name===name)
+  if(index >= 0){
+    log.splice(index,1)
+    btn.classList.remove("added")
+    btn.querySelector(".checkmark").innerText=""
+    update()
+    return
+  }
 
-})
+  // Prompt for pitch count
+  let pitches = prompt("Pitch count for "+name)
+  if(!pitches) return
+  pitches = Number(pitches)
+  if(isNaN(pitches) || pitches<0) return
 
+  log.push({name, pitches})
+  btn.classList.add("added")
+  btn.querySelector(".checkmark").innerText="✔"
+  update()
 }
 
 function update(){
+  const div=document.getElementById("log")
+  div.innerHTML=""
 
-const div=document.getElementById("log")
+  log.forEach(l=>{
+    // add remove option
+    div.innerHTML += `${l.name} — ${l.pitches} <button onclick="removeFromLog('${l.name}')">Remove</button><br>`
+  })
+}
 
-div.innerHTML=""
-
-log.forEach(l=>{
-div.innerHTML+=`${l.name} — ${l.pitches}<br>`
-})
-
+function removeFromLog(name){
+  const index = log.findIndex(l=>l.name===name)
+  if(index>=0){
+    log.splice(index,1)
+    // reset button highlight
+    document.querySelectorAll(".player").forEach(btn=>{
+      if(btn.innerText.includes(name)){
+        btn.classList.remove("added")
+        btn.querySelector(".checkmark").innerText=""
+      }
+    })
+    update()
+  }
 }
 
 async function submitGame(){
-
   const data={
     date:document.getElementById("date").value,
     team:document.getElementById("team").value,
@@ -157,8 +173,9 @@ async function submitGame(){
     notes:document.getElementById("notes").value,
     pitchers:log
   }
-console.log(data)
-  
+
+  console.log(data)
+
   await fetch(API,{
     method:"POST",
     mode:"no-cors",
@@ -169,14 +186,12 @@ console.log(data)
   })
 
   alert("Game Submitted")
-
   log=[]
   update()
-
+  render()
 }
 
 load()
-
 </script>
 
 </body>
