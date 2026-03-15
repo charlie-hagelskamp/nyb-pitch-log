@@ -4,400 +4,176 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Noblesville Travel Baseball Pitch Log</title>
 <style>
-body{
-  font-family:Arial;
-  max-width:600px;
-  margin:auto;
-  padding:20px;
-}
-
-.header{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  margin-bottom:20px;
-}
-
-.header img.logo{
-  width:80px;
-  margin-right:15px;
-}
-
-.header h1{
-  font-size:1.5em;
-  margin:0;
-  flex-grow:1;
-}
-
-.header a.dashboard-link{
-  font-size:0.9em;
-  text-decoration:none;
-  color:#0077cc;
-}
-
-input, select, textarea{
-  width:100%;
-  padding:10px;
-  margin:6px 0 12px 0;
-  font-size:16px;
-  border:1.5px solid #555;
-  border-radius:4px;
-  box-sizing:border-box;
-}
-
-button{
-  width:100%;
-  padding:12px;
-  margin:6px 0;
-  font-size:16px;
-  cursor:pointer;
-}
-
-button:disabled{
-  opacity:0.6;
-  cursor:progress;
-}
-
-.player{
-  background:#ccc;
-  color:#000;
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  padding:8px;
-  margin:4px 0;
-  border-radius:4px;
-}
-
-.player.added{
-  background:#a6e3a1;
-}
-
-.checkmark{
-  font-weight:bold;
-  margin-left:8px;
-}
-
-.log-remove-btn{
-  font-size:12px;
-  margin-left:8px;
-  background:#f88;
-  color:#000;
-  border:none;
-  padding:2px 6px;
-  border-radius:3px;
-  cursor:pointer;
-}
-
-.log-remove-btn:hover{
-  background:#f55;
-}
-
-#summary, #dashboard{
-  margin-top:12px;
-  padding:10px;
-  background:#eef;
-  border-radius:4px;
-}
-
-.spinner{
-  border:3px solid #f3f3f3;
-  border-top:3px solid #555;
-  border-radius:50%;
-  width:16px;
-  height:16px;
-  animation: spin 1s linear infinite;
-  display:inline-block;
-  vertical-align:middle;
-  margin-left:8px;
-}
-
-@keyframes spin{
-  0%{transform:rotate(0deg);}
-  100%{transform:rotate(360deg);}
-}
-
-/* Modal styles */
-.modal{
-  display:none;
-  position:fixed;
-  z-index:1000;
-  left:0;
-  top:0;
-  width:100%;
-  height:100%;
-  overflow:auto;
-  background-color: rgba(0,0,0,0.4);
-}
-
-.modal-content{
-  background-color:#fefefe;
-  margin:15% auto;
-  padding:20px;
-  border:1px solid #888;
-  width:80%;
-  max-width:300px;
-  border-radius:5px;
-  text-align:center;
-}
-
-.modal-content input[type=number]{
-  width:100%;
-  font-size:18px;
-  padding:8px;
-  margin:12px 0;
-  box-sizing:border-box;
-}
-
-.modal-buttons{
-  display:flex;
-  justify-content:space-between;
-}
-
-.modal-buttons button{
-  width:48%;
-  padding:10px;
-  font-size:16px;
-}
+body{font-family:Arial;max-width:600px;margin:auto;padding:20px;}
+.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
+.header img.logo{width:80px;margin-right:15px;}
+.header h1{font-size:1.5em;margin:0;flex-grow:1;}
+.header a.dashboard-link{font-size:0.9em;text-decoration:none;color:#0077cc;}
+input, select, textarea{width:100%;padding:10px;margin:6px 0 12px 0;font-size:16px;border:1.5px solid #555;border-radius:4px;box-sizing:border-box;}
+button{width:100%;padding:12px;margin:6px 0;font-size:16px;cursor:pointer;}
+button:disabled{opacity:0.6;cursor:progress;}
+.player{background:#ccc;color:#000;display:flex;justify-content:space-between;align-items:center;padding:8px;margin:4px 0;border-radius:4px;}
+.player.added{background:#a6e3a1;}
+.checkmark{font-weight:bold;margin-left:8px;}
+.log-remove-btn{font-size:12px;margin-left:8px;background:#f88;color:#000;border:none;padding:2px 6px;border-radius:3px;cursor:pointer;}
+.log-remove-btn:hover{background:#f55;}
+#summary,#dashboard{margin-top:12px;padding:10px;background:#eef;border-radius:4px;}
+.spinner{border:3px solid #f3f3f3;border-top:3px solid #555;border-radius:50%;width:16px;height:16px;animation:spin 1s linear infinite;display:inline-block;vertical-align:middle;margin-left:8px;}
+@keyframes spin{0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}}
+.modal{display:none;position:fixed;z-index:1000;left:0;top:0;width:100%;height:100%;overflow:auto;background-color: rgba(0,0,0,0.4);}
+.modal-content{background-color:#fefefe;margin:15% auto;padding:20px;border:1px solid #888;width:80%;max-width:300px;border-radius:5px;text-align:center;}
+.modal-content input[type=number]{width:100%;font-size:18px;padding:8px;margin:12px 0;box-sizing:border-box;}
+.modal-buttons{display:flex;justify-content:space-between;}
+.modal-buttons button{width:48%;padding:10px;font-size:16px;}
 </style>
 </head>
 <body>
 
 <div class="header">
-  <img src="DC5hbQVQ.jpg" class="logo">
-  <h1>Noblesville Travel Baseball</h1>
-  <a href="#" class="dashboard-link" onclick="showDashboard()">Dashboard</a>
+<img src="DC5hbQVQ.jpg" class="logo">
+<h1>Noblesville Travel Baseball</h1>
+<a href="#" class="dashboard-link" onclick="showDashboard()">Dashboard</a>
 </div>
 
-<h2>Game Pitch Log</h2>
-
 <div id="form-section">
-Date<br>
-<input type="date" id="date"><br>
-
-Team<br>
-<select id="team">
-  <option value="">Select a team</option>
-</select><br>
-
-Opponent<br>
-<input id="opponent"><br>
-
+<h2>Game Pitch Log</h2>
+Date<br><input type="date" id="date"><br>
+Team<br><select id="team"><option value="">Select a team</option></select><br>
+Opponent<br><input id="opponent"><br>
 <div id="pitchers"></div>
-
-<h3>Pitch Log</h3>
-<div id="log"></div>
-
-Game Notes<br>
-<textarea id="notes" rows="4" style="width:100%"></textarea>
-<br>
-
+<h3>Pitch Log</h3><div id="log"></div>
+Game Notes<br><textarea id="notes" rows="4" style="width:100%"></textarea><br>
 <button id="submitBtn" onclick="submitGame()">Submit</button>
 </div>
 
 <div id="summary"></div>
 <div id="dashboard" style="display:none;"></div>
 
-<!-- Modal for pitch count -->
+<!-- Modal -->
 <div id="pitchModal" class="modal">
-  <div class="modal-content">
-    <div id="modalText">Pitch count for </div>
-    <input type="number" id="modalInput" min="0" step="1">
-    <div class="modal-buttons">
-      <button onclick="modalCancel()">Cancel</button>
-      <button onclick="modalConfirm()">OK</button>
-    </div>
-  </div>
+<div class="modal-content">
+<div id="modalText">Pitch count for </div>
+<input type="number" id="modalInput" min="0" step="1">
+<div class="modal-buttons">
+<button onclick="modalCancel()">Cancel</button>
+<button onclick="modalConfirm()">OK</button>
+</div>
+</div>
 </div>
 
 <script>
-const API="https://script.google.com/macros/s/AKfycbwdblCmYSuNrFK_Gk-pQIB4fOKncnpvQ24cgaCUfWcVtGXYieMs16O47MvAoja0FPfL/exec";
-let roster={}, log=[]
-let currentPitcher=null, currentButton=null
+const API="https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec";
+let roster={}, log=[], currentPitcher=null, currentButton=null
 
-function todayDateString(){
-  const today = new Date();
-  const yyyy = today.getFullYear();
-  const mm = String(today.getMonth()+1).padStart(2,'0');
-  const dd = String(today.getDate()).padStart(2,'0');
-  return `${yyyy}-${mm}-${dd}`;
-}
+function todayDateString(){const t=new Date();return t.toISOString().split("T")[0];}
 
 async function load(){
-  document.getElementById("date").value = todayDateString();
-  const res=await fetch("roster.json")
-  roster=await res.json()
-  const teamSelect=document.getElementById("team")
-  Object.keys(roster).forEach(t=>{
-    let opt=document.createElement("option")
-    opt.value=t
-    opt.text=t
-    teamSelect.appendChild(opt)
-  })
-  teamSelect.onchange=render
-  render()
+  document.getElementById("date").value=todayDateString();
+  const res = await fetch("roster.json"); roster=await res.json();
+  const teamSelect=document.getElementById("team");
+  Object.keys(roster).forEach(t=>{let opt=document.createElement("option");opt.value=t;opt.text=t;teamSelect.appendChild(opt);});
+  teamSelect.onchange=render;
+  render();
 }
 
 function render(){
-  const team=document.getElementById("team").value
-  const div=document.getElementById("pitchers")
-  div.innerHTML=""
-  if(!team || team.startsWith("7U")) return
+  const team=document.getElementById("team").value;
+  const div=document.getElementById("pitchers");
+  div.innerHTML="";
+  if(!team || team.startsWith("7U")) return;
   roster[team].forEach(p=>{
-    let btn=document.createElement("button")
-    btn.className="player"
-    btn.innerHTML=p + '<span class="checkmark"></span>'
-    btn.onclick=()=>openPitchModal(p, btn)
-    div.appendChild(btn)
-  })
+    let btn=document.createElement("button"); btn.className="player";
+    btn.innerHTML=p+'<span class="checkmark"></span>';
+    btn.onclick=()=>openPitchModal(p,btn);
+    div.appendChild(btn);
+  });
 }
 
 function openPitchModal(name, btn){
-  const index = log.findIndex(l=>l.name===name)
-  if(index >= 0){
-    log.splice(index,1)
-    btn.classList.remove("added")
-    btn.querySelector(".checkmark").innerText=""
-    update()
-    return
-  }
-  currentPitcher=name
-  currentButton=btn
-  document.getElementById("modalText").innerText = "Pitch count for "+name
-  document.getElementById("modalInput").value=""
-  document.getElementById("pitchModal").style.display="block"
-  document.getElementById("modalInput").focus()
+  const index = log.findIndex(l=>l.name===name);
+  if(index>=0){log.splice(index,1);btn.classList.remove("added");btn.querySelector(".checkmark").innerText="";update();return;}
+  currentPitcher=name; currentButton=btn;
+  document.getElementById("modalText").innerText="Pitch count for "+name;
+  document.getElementById("modalInput").value="";
+  document.getElementById("pitchModal").style.display="block";
+  document.getElementById("modalInput").focus();
 }
 
-function modalCancel(){
-  document.getElementById("pitchModal").style.display="none"
-  currentPitcher=null
-  currentButton=null
-}
-
+function modalCancel(){document.getElementById("pitchModal").style.display="none";currentPitcher=null;currentButton=null;}
 function modalConfirm(){
-  const input = document.getElementById("modalInput").value
-  const pitches = Number(input)
-  if(isNaN(pitches) || pitches<0){
-    alert("Please enter a valid number")
-    return
-  }
-  log.push({name:currentPitcher, pitches, restDays:calculateRestDays(pitches)})
-  currentButton.classList.add("added")
-  currentButton.querySelector(".checkmark").innerText="✔"
-  update()
-  modalCancel()
+  const pitches=Number(document.getElementById("modalInput").value);
+  if(isNaN(pitches)||pitches<0){alert("Please enter a valid number");return;}
+  log.push({name:currentPitcher,pitches,restDays:calculateRestDays(pitches)});
+  currentButton.classList.add("added");
+  currentButton.querySelector(".checkmark").innerText="✔";
+  update(); modalCancel();
 }
 
-function calculateRestDays(pitches){
-  if(pitches <= 20) return 0
-  if(pitches <= 35) return 1
-  if(pitches <= 50) return 2
-  if(pitches <= 65) return 3
-  return 4
-}
-
+function calculateRestDays(p){return p<=20?0:p<=35?1:p<=50?2:p<=65?3:4;}
 function update(){
-  const div=document.getElementById("log")
-  div.innerHTML=""
-  log.forEach(l=>{
-    div.innerHTML += `<div>${l.name} — ${l.pitches} <button class="log-remove-btn" onclick="removeFromLog('${l.name}')">Remove</button></div>`
-  })
+  const div=document.getElementById("log"); div.innerHTML="";
+  log.forEach(l=>{div.innerHTML+=`<div>${l.name} — ${l.pitches} <button class="log-remove-btn" onclick="removeFromLog('${l.name}')">Remove</button></div>`;});
 }
 
 function removeFromLog(name){
-  const index = log.findIndex(l=>l.name===name)
-  if(index>=0){
-    log.splice(index,1)
-    document.querySelectorAll(".player").forEach(btn=>{
-      if(btn.innerText.includes(name)){
-        btn.classList.remove("added")
-        btn.querySelector(".checkmark").innerText=""
-      }
-    })
-    update()
+  const index = log.findIndex(l=>l.name===name);
+  if(index>=0){log.splice(index,1);
+    document.querySelectorAll(".player").forEach(btn=>{if(btn.innerText.includes(name)){btn.classList.remove("added");btn.querySelector(".checkmark").innerText="";}});
+    update();
   }
 }
 
 async function submitGame(){
-  const notes = document.getElementById("notes").value.trim()
-  if(!notes){alert("Please enter Game Notes before submitting.");return}
-  if(log.length === 0){alert("No pitchers added to submit.");return}
-
-  const submitBtn = document.getElementById("submitBtn")
-  submitBtn.disabled = true
-  submitBtn.innerHTML = "Submitting <span class='spinner'></span>"
-
-  const data={
-    date:document.getElementById("date").value,
-    team:document.getElementById("team").value,
-    opponent:document.getElementById("opponent").value,
-    notes:notes,
-    pitchers:log
-  }
-
-  try {
-    await fetch(API,{
-      method:"POST",
-      mode:"no-cors",
-      headers:{"Content-Type":"text/plain"},
-      body:JSON.stringify(data)
-    })
-
-    const summaryDiv = document.getElementById("summary")
-    summaryDiv.innerHTML = "<strong>Pitchers submitted:</strong><br>"
-    log.forEach(p=>summaryDiv.innerHTML += `${p.name} — ${p.pitches} pitches, ${p.restDays} rest days<br>`)
-
-    document.getElementById("opponent").value=""
-    document.getElementById("notes").value=""
-    log=[]
-    update()
-    render()
-  } catch(err){ alert("Error submitting game: "+err) }
-  finally{
-    submitBtn.disabled = false
-    submitBtn.innerHTML = "Submit"
-  }
+  const notes=document.getElementById("notes").value.trim();
+  if(!notes){alert("Please enter Game Notes.");return;}
+  if(log.length===0){alert("No pitchers added.");return;}
+  const submitBtn=document.getElementById("submitBtn");
+  submitBtn.disabled=true; submitBtn.innerHTML="Submitting <span class='spinner'></span>";
+  const data={date:document.getElementById("date").value,team:document.getElementById("team").value,opponent:document.getElementById("opponent").value,notes, pitchers:log};
+  try{
+    await fetch(API,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain"},body:JSON.stringify(data)});
+    const summary=document.getElementById("summary"); summary.innerHTML="<strong>Pitchers submitted:</strong><br>";
+    log.forEach(p=>summary.innerHTML+=`${p.name} — ${p.pitches} pitches, ${p.restDays} rest days<br>`);
+    document.getElementById("opponent").value=""; document.getElementById("notes").value="";
+    log=[]; update(); render();
+  }catch(err){alert("Error submitting game: "+err);}
+  finally{submitBtn.disabled=false; submitBtn.innerHTML="Submit";}
 }
 
 // Dashboard
+function showDashboard(){
+  document.getElementById("form-section").style.display="none";
+  const dashDiv=document.getElementById("dashboard"); dashDiv.style.display="block";
+  dashDiv.innerHTML="<h3>Select your team:</h3>";
+  const select=document.createElement("select");
+  let defaultOpt=document.createElement("option"); defaultOpt.value=""; defaultOpt.text="Select a team"; select.appendChild(defaultOpt);
+  Object.keys(roster).forEach(t=>{let opt=document.createElement("option");opt.value=t;opt.text=t;select.appendChild(opt);});
+  select.onchange=()=>loadTeamStatus(select.value);
+  dashDiv.appendChild(select);
+  const teamStatus=document.createElement("div"); teamStatus.id="teamStatus"; teamStatus.style.marginTop="10px"; dashDiv.appendChild(teamStatus);
 
-async function showDashboard(){
-  document.getElementById("form-section").style.display="none"
-  const dashDiv = document.getElementById("dashboard")
-  dashDiv.style.display="block"
-  dashDiv.innerHTML = "<h3>Select your team:</h3>"
-  const select = document.createElement("select")
-  Object.keys(roster).forEach(t=>{
-    let opt=document.createElement("option")
-    opt.value=t
-    opt.text=t
-    select.appendChild(opt)
-  })
-  select.onchange = ()=>loadTeamStatus(select.value)
-  dashDiv.appendChild(select)
-  const teamStatus = document.createElement("div")
-  teamStatus.id="teamStatus"
-  teamStatus.style.marginTop="10px"
-  dashDiv.appendChild(teamStatus)
+  const backBtn=document.createElement("button"); backBtn.innerText="Back to Submission";
+  backBtn.onclick=()=>{dashDiv.style.display="none";document.getElementById("form-section").style.display="block";};
+  dashDiv.appendChild(backBtn);
 }
 
 async function loadTeamStatus(team){
-  if(!team) return
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Pitching") // placeholder
-  // In browser, we can fetch pitching JSON endpoint if available
-  // Here, simulate fetch from pitching sheet as JSON
-  const pitchingData = await fetch(`pitching-${team}.json`).then(r=>r.json()) // you will need to generate JSON
-  const today = new Date()
-  const div = document.getElementById("teamStatus")
-  div.innerHTML = "<strong>Pitching Status for "+team+"</strong><br>"
-  pitchingData.forEach(p=>{
-    const eligible = new Date(p.eligibleDate) <= today
-    div.innerHTML += `${p.name} — ${eligible ? "✅ Eligible today" : "❌ Next eligible: "+new Date(p.eligibleDate).toDateString()}<br>`
-  })
+  if(!team) return; const div=document.getElementById("teamStatus"); div.innerHTML="Loading...";
+  try{
+    const res=await fetch(`${API}?team=${encodeURIComponent(team)}`);
+    const data=await res.json(); div.innerHTML=`<strong>Pitching Status for ${team}</strong><br>`;
+    if(data.length===0){div.innerHTML+="No pitchers found."; return;}
+    const today=new Date();
+    data.forEach(p=>{
+      const eligible=today>=new Date(p.eligibleDate);
+      const color=eligible?"green":"red";
+      const restText=eligible?"✅ Eligible today":`❌ Next eligible: ${new Date(p.eligibleDate).toDateString()} (${p.restRemaining} day(s) remaining)`;
+      div.innerHTML+=`<div style="color:${color};margin-bottom:4px;">${p.name} — ${restText} (Last game: ${p.lastGame}, Pitches: ${p.pitches})</div>`;
+    });
+  }catch(err){div.innerHTML="Error loading team: "+err;}
 }
 
-load()
+load();
 </script>
 </body>
 </html>
