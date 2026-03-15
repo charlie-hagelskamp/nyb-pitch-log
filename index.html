@@ -149,27 +149,22 @@ div.innerHTML+=`${l.name} — ${l.pitches}<br>`
 }
 
 async function submitGame(){
-
-const data={
-
-date:date.value,
-team:team.value,
-opponent:opponent.value,
-notes:notes.value,
-pitchers:log
-
-}
-
-await fetch(API,{
-method:"POST",
-body:JSON.stringify(data)
-})
-
-alert("Game Submitted")
-
-log=[]
-update()
-
+  const data={
+    date:date.value,
+    team:team.value,
+    opponent:opponent.value,
+    notes:notes.value,
+    pitchers:log
+  }
+  await fetch(API,{
+    method:"POST",
+    mode:"no-cors",
+    headers:{"Content-Type":"text/plain"},
+    body:JSON.stringify(data)
+  })
+  alert("Game Submitted")
+  log=[]
+  update()
 }
 
 load()
