@@ -14,6 +14,7 @@ body{
 .header{
   display:flex;
   align-items:center;
+  justify-content:space-between;
   margin-bottom:20px;
 }
 
@@ -25,6 +26,13 @@ body{
 .header h1{
   font-size:1.5em;
   margin:0;
+  flex-grow:1;
+}
+
+.header a.dashboard-link{
+  font-size:0.9em;
+  text-decoration:none;
+  color:#0077cc;
 }
 
 input, select, textarea{
@@ -85,7 +93,7 @@ button:disabled{
   background:#f55;
 }
 
-#summary{
+#summary, #dashboard{
   margin-top:12px;
   padding:10px;
   background:#eef;
@@ -158,10 +166,12 @@ button:disabled{
 <div class="header">
   <img src="DC5hbQVQ.jpg" class="logo">
   <h1>Noblesville Travel Baseball</h1>
+  <a href="#" class="dashboard-link" onclick="showDashboard()">Dashboard</a>
 </div>
 
 <h2>Game Pitch Log</h2>
 
+<div id="form-section">
 Date<br>
 <input type="date" id="date"><br>
 
@@ -183,8 +193,10 @@ Game Notes<br>
 <br>
 
 <button id="submitBtn" onclick="submitGame()">Submit</button>
+</div>
 
 <div id="summary"></div>
+<div id="dashboard" style="display:none;"></div>
 
 <!-- Modal for pitch count -->
 <div id="pitchModal" class="modal">
@@ -200,7 +212,6 @@ Game Notes<br>
 
 <script>
 const API="https://script.google.com/macros/s/AKfycbwdblCmYSuNrFK_Gk-pQIB4fOKncnpvQ24cgaCUfWcVtGXYieMs16O47MvAoja0FPfL/exec";
-
 let roster={}, log=[]
 let currentPitcher=null, currentButton=null
 
@@ -214,19 +225,15 @@ function todayDateString(){
 
 async function load(){
   document.getElementById("date").value = todayDateString();
-
   const res=await fetch("roster.json")
   roster=await res.json()
-
   const teamSelect=document.getElementById("team")
-
   Object.keys(roster).forEach(t=>{
     let opt=document.createElement("option")
     opt.value=t
     opt.text=t
     teamSelect.appendChild(opt)
   })
-
   teamSelect.onchange=render
   render()
 }
@@ -235,9 +242,7 @@ function render(){
   const team=document.getElementById("team").value
   const div=document.getElementById("pitchers")
   div.innerHTML=""
-
   if(!team || team.startsWith("7U")) return
-
   roster[team].forEach(p=>{
     let btn=document.createElement("button")
     btn.className="player"
@@ -248,7 +253,6 @@ function render(){
 }
 
 function openPitchModal(name, btn){
-  // If already in log, remove
   const index = log.findIndex(l=>l.name===name)
   if(index >= 0){
     log.splice(index,1)
@@ -257,7 +261,6 @@ function openPitchModal(name, btn){
     update()
     return
   }
-
   currentPitcher=name
   currentButton=btn
   document.getElementById("modalText").innerText = "Pitch count for "+name
@@ -279,7 +282,6 @@ function modalConfirm(){
     alert("Please enter a valid number")
     return
   }
-
   log.push({name:currentPitcher, pitches, restDays:calculateRestDays(pitches)})
   currentButton.classList.add("added")
   currentButton.querySelector(".checkmark").innerText="✔"
@@ -298,7 +300,6 @@ function calculateRestDays(pitches){
 function update(){
   const div=document.getElementById("log")
   div.innerHTML=""
-
   log.forEach(l=>{
     div.innerHTML += `<div>${l.name} — ${l.pitches} <button class="log-remove-btn" onclick="removeFromLog('${l.name}')">Remove</button></div>`
   })
@@ -320,14 +321,8 @@ function removeFromLog(name){
 
 async function submitGame(){
   const notes = document.getElementById("notes").value.trim()
-  if(!notes){
-    alert("Please enter Game Notes before submitting.")
-    return
-  }
-  if(log.length === 0){
-    alert("No pitchers added to submit.")
-    return
-  }
+  if(!notes){alert("Please enter Game Notes before submitting.");return}
+  if(log.length === 0){alert("No pitchers added to submit.");return}
 
   const submitBtn = document.getElementById("submitBtn")
   submitBtn.disabled = true
@@ -349,23 +344,57 @@ async function submitGame(){
       body:JSON.stringify(data)
     })
 
-    // Show summary
     const summaryDiv = document.getElementById("summary")
     summaryDiv.innerHTML = "<strong>Pitchers submitted:</strong><br>"
     log.forEach(p=>summaryDiv.innerHTML += `${p.name} — ${p.pitches} pitches, ${p.restDays} rest days<br>`)
 
-    // Clear inputs
     document.getElementById("opponent").value=""
     document.getElementById("notes").value=""
     log=[]
     update()
     render()
-  } catch(err){
-    alert("Error submitting game: "+err)
-  } finally {
+  } catch(err){ alert("Error submitting game: "+err) }
+  finally{
     submitBtn.disabled = false
     submitBtn.innerHTML = "Submit"
   }
+}
+
+// Dashboard
+
+async function showDashboard(){
+  document.getElementById("form-section").style.display="none"
+  const dashDiv = document.getElementById("dashboard")
+  dashDiv.style.display="block"
+  dashDiv.innerHTML = "<h3>Select your team:</h3>"
+  const select = document.createElement("select")
+  Object.keys(roster).forEach(t=>{
+    let opt=document.createElement("option")
+    opt.value=t
+    opt.text=t
+    select.appendChild(opt)
+  })
+  select.onchange = ()=>loadTeamStatus(select.value)
+  dashDiv.appendChild(select)
+  const teamStatus = document.createElement("div")
+  teamStatus.id="teamStatus"
+  teamStatus.style.marginTop="10px"
+  dashDiv.appendChild(teamStatus)
+}
+
+async function loadTeamStatus(team){
+  if(!team) return
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Pitching") // placeholder
+  // In browser, we can fetch pitching JSON endpoint if available
+  // Here, simulate fetch from pitching sheet as JSON
+  const pitchingData = await fetch(`pitching-${team}.json`).then(r=>r.json()) // you will need to generate JSON
+  const today = new Date()
+  const div = document.getElementById("teamStatus")
+  div.innerHTML = "<strong>Pitching Status for "+team+"</strong><br>"
+  pitchingData.forEach(p=>{
+    const eligible = new Date(p.eligibleDate) <= today
+    div.innerHTML += `${p.name} — ${eligible ? "✅ Eligible today" : "❌ Next eligible: "+new Date(p.eligibleDate).toDateString()}<br>`
+  })
 }
 
 load()
