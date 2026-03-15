@@ -157,7 +157,8 @@ async function submitGame(){
     notes:document.getElementById("notes").value,
     pitchers:log
   }
-
+console.log(data)
+  
   await fetch(API,{
     method:"POST",
     mode:"no-cors",
