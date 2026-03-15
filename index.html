@@ -214,7 +214,7 @@ button:disabled{
 </div>
 
 <script>
-const API = "https://script.google.com/macros/s/AKfycbwYw3hAF-O6qeiDkR9pb10OuwgXc8PrX48ZiRj2KCcrkAaPfFj9dJG4YXesRe4rsUc4/exec";
+const API="https://script.google.com/macros/s/AKfycbwYw3hAF-O6qeiDkR9pb10OuwgXc8PrX48ZiRj2KCcrkAaPfFj9dJG4YXesRe4rsUc4/exec";
 
 let roster = {};
 let log = [];
@@ -435,55 +435,74 @@ function backToForm(){
   document.getElementById("summary").style.display = "block";
 }
 
-async function loadTeamStatus(team){
+function loadTeamStatus(team){
   if(!team) return;
 
-  try{
-    const res = await fetch(API + "?team=" + encodeURIComponent(team));
-    const data = await res.json();
+  document.getElementById("teamStatus").innerHTML = "Loading...";
+  document.getElementById("eligibleToday").innerHTML = "";
 
-    const today = new Date();
-    today.setHours(0,0,0,0);
+  const callbackName = "dashboardCallback_" + Date.now();
 
-    let statusHTML = "<h3>Pitching Status</h3>";
-    let eligibleHTML = "<h3>Who Can Pitch Today</h3>";
-    let anyEligible = false;
+  window[callbackName] = function(data){
+    try {
+      const today = new Date();
+      today.setHours(0,0,0,0);
 
-    if(!Array.isArray(data) || data.length === 0){
-      statusHTML += "No pitching records found for this team.";
-      eligibleHTML += "No pitchers eligible today";
+      let statusHTML = "<h3>Pitching Status</h3>";
+      let eligibleHTML = "<h3>Who Can Pitch Today</h3>";
+      let anyEligible = false;
+
+      if(!Array.isArray(data) || data.length === 0){
+        statusHTML += "No pitching records found for this team.";
+        eligibleHTML += "No pitchers eligible today";
+        document.getElementById("teamStatus").innerHTML = statusHTML;
+        document.getElementById("eligibleToday").innerHTML = eligibleHTML;
+        cleanupJsonp(callbackName);
+        return;
+      }
+
+      data.forEach(p=>{
+        const eligibleDate = new Date(p.eligibleDate + "T00:00:00");
+        const eligible = eligibleDate <= today;
+
+        statusHTML += eligible
+          ? `<div class="status-good">🟢 ${p.name} — Eligible today</div>`
+          : `<div class="status-bad">🔴 ${p.name} — Next eligible ${eligibleDate.toLocaleDateString()}</div>`;
+
+        if(eligible){
+          eligibleHTML += `<div class="status-good">🟢 ${p.name}</div>`;
+          anyEligible = true;
+        }
+      });
+
+      if(!anyEligible){
+        eligibleHTML += "No pitchers eligible today";
+      }
+
       document.getElementById("teamStatus").innerHTML = statusHTML;
       document.getElementById("eligibleToday").innerHTML = eligibleHTML;
-      return;
+    } finally {
+      cleanupJsonp(callbackName);
     }
+  };
 
-    data.forEach(p=>{
-      const eligibleDate = new Date(p.eligibleDate);
-      eligibleDate.setHours(0,0,0,0);
-
-      const eligible = eligibleDate <= today;
-
-      statusHTML += eligible
-        ? `<div class="status-good">🟢 ${p.name} — Eligible today</div>`
-        : `<div class="status-bad">🔴 ${p.name} — Next eligible ${eligibleDate.toLocaleDateString()}</div>`;
-
-      if(eligible){
-        eligibleHTML += `<div class="status-good">🟢 ${p.name}</div>`;
-        anyEligible = true;
-      }
-    });
-
-    if(!anyEligible){
-      eligibleHTML += "No pitchers eligible today";
-    }
-
-    document.getElementById("teamStatus").innerHTML = statusHTML;
-    document.getElementById("eligibleToday").innerHTML = eligibleHTML;
-
-  }catch(err){
-    document.getElementById("teamStatus").innerHTML = `<div class="status-bad">Error loading dashboard: ${err}</div>`;
+  const script = document.createElement("script");
+  script.id = callbackName;
+  script.src = API + "?team=" + encodeURIComponent(team) + "&callback=" + callbackName;
+  script.onerror = function(){
+    document.getElementById("teamStatus").innerHTML =
+      `<div class="status-bad">Error loading dashboard data.</div>`;
     document.getElementById("eligibleToday").innerHTML = "";
-  }
+    cleanupJsonp(callbackName);
+  };
+
+  document.body.appendChild(script);
+}
+
+function cleanupJsonp(callbackName){
+  const script = document.getElementById(callbackName);
+  if(script) script.remove();
+  delete window[callbackName];
 }
 
 load();
