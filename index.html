@@ -1,39 +1,196 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Noblesville Travel Baseball</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Noblesville Travel Baseball Pitch Log</title>
+
 <style>
-body{font-family:Arial;max-width:600px;margin:auto;padding:20px;}
-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
-header img{width:80px;}
-header h1{margin:0;font-size:20px;}
-button{padding:10px;margin:4px 0;font-size:16px;cursor:pointer;}
-.player{padding:6px 10px;margin:2px;background:#ddd;color:#000;border:none;border-radius:4px;display:flex;align-items:center;justify-content:space-between;}
-.remove-btn{margin-left:8px;padding:2px 6px;font-size:12px;background:red;color:#fff;border:none;border-radius:3px;cursor:pointer;}
-#log div{margin-bottom:4px;}
-input, select, textarea{width:100%;padding:8px;margin:4px 0;border:1px solid #888;border-radius:4px;}
-.spinner{display:none;margin-left:8px;}
+
+body{
+  font-family:Arial;
+  max-width:600px;
+  margin:auto;
+  padding:20px;
+}
+
+.header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:20px;
+}
+
+.header img.logo{
+  width:80px;
+  margin-right:15px;
+}
+
+.header h1{
+  font-size:1.5em;
+  margin:0;
+  flex-grow:1;
+}
+
+.header a.dashboard-link{
+  font-size:0.9em;
+  text-decoration:none;
+  color:#0077cc;
+}
+
+input, select, textarea{
+  width:100%;
+  padding:10px;
+  margin:6px 0 12px 0;
+  font-size:16px;
+  border:1.5px solid #555;
+  border-radius:4px;
+  box-sizing:border-box;
+}
+
+button{
+  width:100%;
+  padding:12px;
+  margin:6px 0;
+  font-size:16px;
+  cursor:pointer;
+}
+
+button:disabled{
+  opacity:0.6;
+  cursor:progress;
+}
+
+.player{
+  background:#ccc;
+  color:#000;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:8px;
+  margin:4px 0;
+  border-radius:4px;
+}
+
+.player.added{
+  background:#a6e3a1;
+}
+
+.checkmark{
+  font-weight:bold;
+  margin-left:8px;
+}
+
+.log-remove-btn{
+  font-size:12px;
+  margin-left:8px;
+  background:#f88;
+  color:#000;
+  border:none;
+  padding:2px 6px;
+  border-radius:3px;
+  cursor:pointer;
+}
+
+.log-remove-btn:hover{
+  background:#f55;
+}
+
+#summary, #dashboard{
+  margin-top:12px;
+  padding:10px;
+  background:#eef;
+  border-radius:4px;
+}
+
+.spinner{
+  border:3px solid #f3f3f3;
+  border-top:3px solid #555;
+  border-radius:50%;
+  width:16px;
+  height:16px;
+  animation: spin 1s linear infinite;
+  display:inline-block;
+  vertical-align:middle;
+  margin-left:8px;
+}
+
+@keyframes spin{
+  0%{transform:rotate(0deg);}
+  100%{transform:rotate(360deg);}
+}
+
+.modal{
+  display:none;
+  position:fixed;
+  z-index:1000;
+  left:0;
+  top:0;
+  width:100%;
+  height:100%;
+  background-color: rgba(0,0,0,0.4);
+}
+
+.modal-content{
+  background-color:#fff;
+  margin:15% auto;
+  padding:20px;
+  width:80%;
+  max-width:300px;
+  border-radius:5px;
+  text-align:center;
+}
+
+.modal-content input{
+  width:100%;
+  font-size:18px;
+  padding:8px;
+  margin:12px 0;
+}
+
+.modal-buttons{
+  display:flex;
+  justify-content:space-between;
+}
+
+.modal-buttons button{
+  width:48%;
+}
+
+.status-good{
+  color:green;
+  font-weight:bold;
+}
+
+.status-bad{
+  color:red;
+  font-weight:bold;
+}
+
 </style>
 </head>
+
 <body>
-<header>
+
+<div class="header">
 <img src="DC5hbQVQ.jpg" class="logo">
 <h1>Noblesville Travel Baseball</h1>
-</header>
+<a href="#" class="dashboard-link" onclick="showDashboard()">Dashboard</a>
+</div>
 
 <h2>Game Pitch Log</h2>
 
+<div id="form-section">
+
 Date<br>
-<input type="date" id="date"><br>
+<input type="date" id="date">
 
 Team<br>
 <select id="team">
-<option value="">--Select Team--</option>
-</select><br>
+<option value="">Select a team</option>
+</select>
 
 Opponent<br>
-<input id="opponent"><br>
+<input id="opponent">
 
 <div id="pitchers"></div>
 
@@ -41,141 +198,387 @@ Opponent<br>
 <div id="log"></div>
 
 Game Notes<br>
-<textarea id="notes" rows="4"></textarea><br>
+<textarea id="notes" rows="4"></textarea>
 
-<button id="submitBtn" onclick="submitGame()">Submit<span class="spinner" id="spinner">⏳</span></button>
+<button id="submitBtn" onclick="submitGame()">Submit</button>
 
-<hr>
-<h2>Dashboard</h2>
-Team<br>
-<select id="dashTeam">
-<option value="">--Select Team--</option>
-</select><br>
-<div id="dashboard"></div>
-<button onclick="showForm()">Back to Submit</button>
+</div>
+
+<div id="summary"></div>
+
+<div id="dashboard" style="display:none;"></div>
+
+<!-- MODAL -->
+
+<div id="pitchModal" class="modal">
+<div class="modal-content">
+
+<div id="modalText"></div>
+
+<input type="number" id="modalInput" min="0">
+
+<div class="modal-buttons">
+<button onclick="modalCancel()">Cancel</button>
+<button onclick="modalConfirm()">OK</button>
+</div>
+
+</div>
+</div>
 
 <script>
-const API = "https://script.google.com/macros/s/AKfycbxQ4g4cDvXQw-dwr2WVD_LwuaUkwWK1k4LUW1marc7VAFYGufR-YDeMz_kVVr05wWC_/exec"; // replace with deployed Apps Script URL
-let roster = {};
-let log = [];
 
-// Load roster.json and populate team dropdowns
-async function loadRoster() {
-  const res = await fetch("roster.json");
-  roster = await res.json();
-  const teamSel = document.getElementById("team");
-  const dashSel = document.getElementById("dashTeam");
-  Object.keys(roster).forEach(t=>{
-    let opt = document.createElement("option");
-    opt.value=t; opt.text=t;
-    teamSel.appendChild(opt);
-    dashSel.appendChild(opt.cloneNode(true));
-  });
-  document.getElementById("date").valueAsDate = new Date();
-  renderPlayers();
+const API="https://script.google.com/macros/s/AKfycbwYw3hAF-O6qeiDkR9pb10OuwgXc8PrX48ZiRj2KCcrkAaPfFj9dJG4YXesRe4rsUc4/exec"
+
+let roster={}
+let log=[]
+
+let currentPitcher=null
+let currentButton=null
+
+
+function todayDateString(){
+
+const t=new Date()
+
+return t.getFullYear()+"-"+String(t.getMonth()+1).padStart(2,"0")+"-"+String(t.getDate()).padStart(2,"0")
+
 }
 
-function renderPlayers() {
-  const team = document.getElementById("team").value;
-  const div = document.getElementById("pitchers");
-  div.innerHTML="";
-  if(!team || team.startsWith("7U")) return;
-  roster[team].forEach(p=>{
-    const btn = document.createElement("button");
-    btn.className="player";
-    btn.innerHTML=`${p} <span class="check">✔</span>`;
-    btn.querySelector(".check").style.display="none";
-    const removeBtn = document.createElement("button");
-    removeBtn.textContent="x";
-    removeBtn.className="remove-btn";
-    removeBtn.onclick=e=>{
-      log = log.filter(l=>l.name!==p);
-      updateLog(); e.stopPropagation();
-      btn.querySelector(".check").style.display="none";
-    };
-    btn.appendChild(removeBtn);
-    btn.onclick=async ()=>{
-      let pitches = prompt("Pitch count for "+p,"");
-      if(pitches===null) return;
-      pitches = Number(pitches);
-      if(isNaN(pitches)) { alert("Enter a number"); return;}
-      const existing = log.find(l=>l.name===p);
-      if(existing) existing.pitches = pitches;
-      else log.push({name:p,pitches:pitches});
-      btn.querySelector(".check").style.display="inline";
-      updateLog();
-    };
-    div.appendChild(btn);
-  });
+async function load(){
+
+document.getElementById("date").value=todayDateString()
+
+const res=await fetch("roster.json")
+roster=await res.json()
+
+const teamSelect=document.getElementById("team")
+
+Object.keys(roster).forEach(t=>{
+let opt=document.createElement("option")
+opt.value=t
+opt.text=t
+teamSelect.appendChild(opt)
+})
+
+teamSelect.onchange=render
+
+render()
+
 }
 
-function updateLog() {
-  const div = document.getElementById("log");
-  div.innerHTML="";
-  log.forEach(l=>{ div.innerHTML+=`${l.name} — ${l.pitches}<br>`; });
+
+function render(){
+
+const team=document.getElementById("team").value
+const div=document.getElementById("pitchers")
+
+div.innerHTML=""
+
+if(!team || team.startsWith("7U")) return
+
+roster[team].forEach(p=>{
+
+let btn=document.createElement("button")
+
+btn.className="player"
+
+btn.innerHTML=p+'<span class="checkmark"></span>'
+
+btn.onclick=()=>openPitchModal(p,btn)
+
+div.appendChild(btn)
+
+})
+
 }
 
-async function submitGame() {
-  const notes = document.getElementById("notes").value.trim();
-  if(!notes){alert("Game Notes required"); return;}
-  const data = {
-    date: document.getElementById("date").value,
-    team: document.getElementById("team").value,
-    opponent: document.getElementById("opponent").value,
-    notes: notes,
-    pitchers: log
-  };
-  const btn = document.getElementById("submitBtn");
-  document.getElementById("spinner").style.display="inline";
-  try {
-    const res = await fetch(API, {
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body: JSON.stringify(data),
-      mode:"cors"
-    });
-    const result = await res.json();
-    alert("Game submitted!\nPitchers:\n"+result.pitchers.map(p=>`${p.name} — Rest Days: ${p.restDays}, Eligible: ${p.eligibleDate}`).join("\n"));
-    log=[]; updateLog();
-    document.getElementById("opponent").value="";
-    document.getElementById("notes").value="";
-    renderPlayers();
-  } catch(e){ alert("Submit failed: "+e); }
-  finally { document.getElementById("spinner").style.display="none"; }
+
+function openPitchModal(name,btn){
+
+const index=log.findIndex(l=>l.name===name)
+
+if(index>=0){
+
+log.splice(index,1)
+
+btn.classList.remove("added")
+
+btn.querySelector(".checkmark").innerText=""
+
+update()
+
+return
+
 }
 
-// Dashboard
-async function loadDashboard() {
-  const team = document.getElementById("dashTeam").value;
-  if(!team) return;
-  const url = `${API}?team=${encodeURIComponent(team)}`;
-  try {
-    const res = await fetch(url, { mode:"cors" });
-    const data = await res.json();
-    renderDashboard(data);
-  } catch(e){ document.getElementById("dashboard").innerHTML="Error loading team: "+e; }
+currentPitcher=name
+currentButton=btn
+
+document.getElementById("modalText").innerText="Pitch count for "+name
+document.getElementById("modalInput").value=""
+document.getElementById("pitchModal").style.display="block"
+
 }
 
-function renderDashboard(rows) {
-  const div = document.getElementById("dashboard");
-  div.innerHTML="";
-  if(rows.length===0) { div.innerHTML="No data"; return; }
-  rows.forEach(r=>{
-    const row = document.createElement("div");
-    row.textContent=`${r.name} — Eligible: ${r.eligible? "Yes":"No"} — Rest days remaining: ${r.restRemaining} — Eligible on: ${r.eligibleDate}`;
-    div.appendChild(row);
-  });
+
+function modalCancel(){
+
+document.getElementById("pitchModal").style.display="none"
+
 }
 
-function showForm(){
-  document.getElementById("dashboard").innerHTML="";
-  document.getElementById("dashTeam").value="";
+
+function modalConfirm(){
+
+const pitches=Number(document.getElementById("modalInput").value)
+
+if(isNaN(pitches)||pitches<0){
+
+alert("Enter valid pitch count")
+
+return
+
 }
 
-document.getElementById("team").addEventListener("change", renderPlayers);
-document.getElementById("dashTeam").addEventListener("change", loadDashboard);
+log.push({
 
-loadRoster();
+name:currentPitcher,
+pitches:pitches,
+restDays:calculateRestDays(pitches)
+
+})
+
+currentButton.classList.add("added")
+currentButton.querySelector(".checkmark").innerText="✔"
+
+update()
+
+modalCancel()
+
+}
+
+
+function calculateRestDays(p){
+
+if(p<=20) return 0
+if(p<=35) return 1
+if(p<=50) return 2
+if(p<=65) return 3
+return 4
+
+}
+
+
+function update(){
+
+const div=document.getElementById("log")
+
+div.innerHTML=""
+
+log.forEach(l=>{
+
+div.innerHTML+=`${l.name} — ${l.pitches}
+<button class="log-remove-btn" onclick="removeFromLog('${l.name}')">Remove</button><br>`
+
+})
+
+}
+
+
+function removeFromLog(name){
+
+const index=log.findIndex(l=>l.name===name)
+
+if(index>=0){
+
+log.splice(index,1)
+
+document.querySelectorAll(".player").forEach(btn=>{
+
+if(btn.innerText.includes(name)){
+
+btn.classList.remove("added")
+
+btn.querySelector(".checkmark").innerText=""
+
+}
+
+})
+
+update()
+
+}
+
+}
+
+
+async function submitGame(){
+
+const notes=document.getElementById("notes").value.trim()
+
+if(!notes){alert("Please enter Game Notes");return}
+
+if(log.length===0){alert("No pitchers added");return}
+
+const submitBtn=document.getElementById("submitBtn")
+
+submitBtn.disabled=true
+submitBtn.innerHTML="Submitting <span class='spinner'></span>"
+
+const data={
+
+date:document.getElementById("date").value,
+team:document.getElementById("team").value,
+opponent:document.getElementById("opponent").value,
+notes:notes,
+pitchers:log
+
+}
+
+try{
+
+const res=await fetch(API,{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify(data)
+})
+
+const result=await res.json()
+
+const summaryDiv=document.getElementById("summary")
+
+summaryDiv.innerHTML="<strong>Pitchers submitted:</strong><br>"
+
+result.pitchers.forEach(p=>{
+
+summaryDiv.innerHTML+=`${p.name} — ${p.restDays} rest days (eligible ${p.eligibleDate})<br>`
+
+})
+
+document.getElementById("opponent").value=""
+document.getElementById("notes").value=""
+
+log=[]
+update()
+render()
+
+}catch(e){
+
+alert("Submit error "+e)
+
+}
+
+submitBtn.disabled=false
+submitBtn.innerHTML="Submit"
+
+}
+
+
+
+function showDashboard(){
+
+document.getElementById("form-section").style.display="none"
+
+const dash=document.getElementById("dashboard")
+
+dash.style.display="block"
+
+dash.innerHTML=`
+
+<button onclick="backToForm()">⬅ Back to Game Submission</button>
+
+<h3>Pitching Dashboard</h3>
+
+Select Team<br>
+
+<select id="dashTeam"></select>
+
+<div id="teamStatus" style="margin-top:15px;"></div>
+
+<div id="eligibleToday" style="margin-top:20px;"></div>
+
+`
+
+const sel=document.getElementById("dashTeam")
+
+Object.keys(roster).forEach(t=>{
+
+let o=document.createElement("option")
+o.value=t
+o.text=t
+
+sel.appendChild(o)
+
+})
+
+sel.onchange=()=>loadTeamStatus(sel.value)
+
+}
+
+
+function backToForm(){
+
+document.getElementById("dashboard").style.display="none"
+
+document.getElementById("form-section").style.display="block"
+
+}
+
+
+
+async function loadTeamStatus(team){
+
+if(!team) return
+
+const res=await fetch(API+"?team="+encodeURIComponent(team))
+
+const data=await res.json()
+
+const today=new Date()
+
+let statusHTML="<h3>Pitching Status</h3>"
+
+let eligibleHTML="<h3>Who Can Pitch Today</h3>"
+
+let anyEligible=false
+
+data.forEach(p=>{
+
+const eligible=new Date(p.eligibleDate)<=today
+
+statusHTML+=`
+${eligible
+?'<span class="status-good">🟢 '+p.name+' — Eligible</span>'
+:'<span class="status-bad">🔴 '+p.name+' — Next eligible '+new Date(p.eligibleDate).toLocaleDateString()+'</span>'}
+<br>
+`
+
+if(eligible){
+
+eligibleHTML+="🟢 "+p.name+"<br>"
+
+anyEligible=true
+
+}
+
+})
+
+if(!anyEligible){
+
+eligibleHTML+="No pitchers eligible today"
+
+}
+
+document.getElementById("teamStatus").innerHTML=statusHTML
+
+document.getElementById("eligibleToday").innerHTML=eligibleHTML
+
+}
+
+
+load()
+
 </script>
+
 </body>
 </html>
