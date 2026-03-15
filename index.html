@@ -11,14 +11,30 @@ body{
   padding:20px;
 }
 
-.logo{
-  width:120px;
-  display:block;
-  margin:auto;
+.header{
+  display:flex;
+  align-items:center;
+  margin-bottom:20px;
 }
 
-h1{
-  text-align:center;
+.header img.logo{
+  width:80px;
+  margin-right:15px;
+}
+
+.header h1{
+  font-size:1.5em;
+  margin:0;
+}
+
+input, select, textarea{
+  width:100%;
+  padding:10px;
+  margin:6px 0 12px 0;
+  font-size:16px;
+  border:1.5px solid #555; /* darker outline */
+  border-radius:4px;
+  box-sizing:border-box;
 }
 
 button{
@@ -38,32 +54,39 @@ button{
 }
 
 .player.added{
-  background:#a6e3a1; /* light green to indicate added */
+  background:#a6e3a1; /* light green for added */
 }
 
 .checkmark{
   font-weight:bold;
   margin-left:8px;
 }
+
+.log-remove-btn{
+  font-size:14px;
+  margin-left:8px;
+}
 </style>
 </head>
 <body>
 
-<img src="DC5hbQVQ.jpg" class="logo">
-<h1>Noblesville Travel Baseball</h1>
+<div class="header">
+  <img src="DC5hbQVQ.jpg" class="logo">
+  <h1>Noblesville Travel Baseball</h1>
+</div>
 
 <h2>Game Pitch Log</h2>
 
 Date<br>
-<input type="date" id="date"><br><br>
+<input type="date" id="date"><br>
 
 Team<br>
 <select id="team">
   <option value="">Select a team</option>
-</select><br><br>
+</select><br>
 
 Opponent<br>
-<input id="opponent"><br><br>
+<input id="opponent"><br>
 
 <div id="pitchers"></div>
 
@@ -72,7 +95,7 @@ Opponent<br>
 
 Game Notes<br>
 <textarea id="notes" rows="4" style="width:100%"></textarea>
-<br><br>
+<br>
 
 <button onclick="submitGame()">Submit</button>
 
@@ -110,9 +133,7 @@ function render(){
     let btn=document.createElement("button")
     btn.className="player"
     btn.innerHTML=p + '<span class="checkmark"></span>'
-
     btn.onclick=()=>addOrRemovePitcher(p, btn)
-
     div.appendChild(btn)
   })
 }
@@ -128,11 +149,9 @@ function addOrRemovePitcher(name, btn){
     return
   }
 
-  // Prompt for pitch count
-  let pitches = prompt("Pitch count for "+name)
-  if(!pitches) return
-  pitches = Number(pitches)
-  if(isNaN(pitches) || pitches<0) return
+  // Use input type=number to trigger number keypad on mobile
+  let pitches = promptNumber("Pitch count for "+name)
+  if(pitches === null) return
 
   log.push({name, pitches})
   btn.classList.add("added")
@@ -140,13 +159,20 @@ function addOrRemovePitcher(name, btn){
   update()
 }
 
+function promptNumber(message){
+  const input = window.prompt(message,"0")
+  if(input === null) return null
+  const num = Number(input)
+  if(isNaN(num) || num<0) return null
+  return num
+}
+
 function update(){
   const div=document.getElementById("log")
   div.innerHTML=""
 
   log.forEach(l=>{
-    // add remove option
-    div.innerHTML += `${l.name} — ${l.pitches} <button onclick="removeFromLog('${l.name}')">Remove</button><br>`
+    div.innerHTML += `${l.name} — ${l.pitches} <button class="log-remove-btn" onclick="removeFromLog('${l.name}')">Remove</button><br>`
   })
 }
 
@@ -154,7 +180,6 @@ function removeFromLog(name){
   const index = log.findIndex(l=>l.name===name)
   if(index>=0){
     log.splice(index,1)
-    // reset button highlight
     document.querySelectorAll(".player").forEach(btn=>{
       if(btn.innerText.includes(name)){
         btn.classList.remove("added")
@@ -166,11 +191,17 @@ function removeFromLog(name){
 }
 
 async function submitGame(){
+  const notes = document.getElementById("notes").value.trim()
+  if(!notes){
+    alert("Please enter Game Notes before submitting.")
+    return
+  }
+
   const data={
     date:document.getElementById("date").value,
     team:document.getElementById("team").value,
     opponent:document.getElementById("opponent").value,
-    notes:document.getElementById("notes").value,
+    notes:notes,
     pitchers:log
   }
 
@@ -186,6 +217,10 @@ async function submitGame(){
   })
 
   alert("Game Submitted")
+
+  // Clear fields after submit
+  document.getElementById("opponent").value=""
+  document.getElementById("notes").value=""
   log=[]
   update()
   render()
