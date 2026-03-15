@@ -95,7 +95,7 @@ button:disabled{
   background:#f55;
 }
 
-#summary, #dashboard{
+#summary,#dashboard{
   margin-top:12px;
   padding:10px;
   background:#eef;
@@ -108,15 +108,14 @@ button:disabled{
   border-radius:50%;
   width:16px;
   height:16px;
-  animation: spin 1s linear infinite;
+  animation:spin 1s linear infinite;
   display:inline-block;
-  vertical-align:middle;
   margin-left:8px;
 }
 
 @keyframes spin{
-  0%{transform:rotate(0deg);}
-  100%{transform:rotate(360deg);}
+0%{transform:rotate(0deg);}
+100%{transform:rotate(360deg);}
 }
 
 .modal{
@@ -127,11 +126,11 @@ button:disabled{
   top:0;
   width:100%;
   height:100%;
-  background-color: rgba(0,0,0,0.4);
+  background-color:rgba(0,0,0,0.4);
 }
 
 .modal-content{
-  background-color:#fff;
+  background:#fff;
   margin:15% auto;
   padding:20px;
   width:80%;
@@ -156,15 +155,8 @@ button:disabled{
   width:48%;
 }
 
-.status-good{
-  color:green;
-  font-weight:bold;
-}
-
-.status-bad{
-  color:red;
-  font-weight:bold;
-}
+.status-good{color:green;font-weight:bold;}
+.status-bad{color:red;font-weight:bold;}
 
 </style>
 </head>
@@ -208,7 +200,7 @@ Game Notes<br>
 
 <div id="dashboard" style="display:none;"></div>
 
-<!-- MODAL -->
+<!-- Pitch Count Modal -->
 
 <div id="pitchModal" class="modal">
 <div class="modal-content">
@@ -231,7 +223,6 @@ const API="https://script.google.com/macros/s/AKfycbwYw3hAF-O6qeiDkR9pb10OuwgXc8
 
 let roster={}
 let log=[]
-
 let currentPitcher=null
 let currentButton=null
 
@@ -244,20 +235,26 @@ return t.getFullYear()+"-"+String(t.getMonth()+1).padStart(2,"0")+"-"+String(t.g
 
 }
 
+
 async function load(){
 
 document.getElementById("date").value=todayDateString()
 
 const res=await fetch("roster.json")
+
 roster=await res.json()
 
 const teamSelect=document.getElementById("team")
 
 Object.keys(roster).forEach(t=>{
+
 let opt=document.createElement("option")
+
 opt.value=t
 opt.text=t
+
 teamSelect.appendChild(opt)
+
 })
 
 teamSelect.onchange=render
@@ -270,6 +267,7 @@ render()
 function render(){
 
 const team=document.getElementById("team").value
+
 const div=document.getElementById("pitchers")
 
 div.innerHTML=""
@@ -315,7 +313,9 @@ currentPitcher=name
 currentButton=btn
 
 document.getElementById("modalText").innerText="Pitch count for "+name
+
 document.getElementById("modalInput").value=""
+
 document.getElementById("pitchModal").style.display="block"
 
 }
@@ -349,6 +349,7 @@ restDays:calculateRestDays(pitches)
 })
 
 currentButton.classList.add("added")
+
 currentButton.querySelector(".checkmark").innerText="✔"
 
 update()
@@ -437,21 +438,19 @@ pitchers:log
 
 try{
 
-const res=await fetch(API,{
+await fetch(API,{
 method:"POST",
-headers:{"Content-Type":"application/json"},
+mode:"no-cors",
 body:JSON.stringify(data)
 })
-
-const result=await res.json()
 
 const summaryDiv=document.getElementById("summary")
 
 summaryDiv.innerHTML="<strong>Pitchers submitted:</strong><br>"
 
-result.pitchers.forEach(p=>{
+data.pitchers.forEach(p=>{
 
-summaryDiv.innerHTML+=`${p.name} — ${p.restDays} rest days (eligible ${p.eligibleDate})<br>`
+summaryDiv.innerHTML+=`${p.name} — ${p.pitches} pitches, ${p.restDays} rest days<br>`
 
 })
 
@@ -472,7 +471,6 @@ submitBtn.disabled=false
 submitBtn.innerHTML="Submit"
 
 }
-
 
 
 function showDashboard(){
@@ -504,6 +502,7 @@ const sel=document.getElementById("dashTeam")
 Object.keys(roster).forEach(t=>{
 
 let o=document.createElement("option")
+
 o.value=t
 o.text=t
 
@@ -523,7 +522,6 @@ document.getElementById("dashboard").style.display="none"
 document.getElementById("form-section").style.display="block"
 
 }
-
 
 
 async function loadTeamStatus(team){
