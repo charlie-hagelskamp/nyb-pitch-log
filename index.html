@@ -7,7 +7,7 @@
 <style>
 body{
   font-family:Arial;
-  max-width:600px;
+  max-width:900px;
   margin:auto;
   padding:20px;
 }
@@ -155,13 +155,40 @@ button:disabled{
 .status-good{
   color:green;
   font-weight:bold;
-  margin-bottom:6px;
 }
 
 .status-bad{
   color:red;
   font-weight:bold;
-  margin-bottom:6px;
+}
+
+.dashboard-table{
+  width:100%;
+  border-collapse:collapse;
+  margin-top:12px;
+  font-size:14px;
+}
+
+.dashboard-table th,
+.dashboard-table td{
+  border:1px solid #ccc;
+  padding:8px;
+  text-align:left;
+  vertical-align:top;
+}
+
+.dashboard-table th{
+  background:#dfe8f7;
+}
+
+@media (max-width:700px){
+  .dashboard-table{
+    font-size:12px;
+  }
+  .dashboard-table th,
+  .dashboard-table td{
+    padding:6px;
+  }
 }
 </style>
 </head>
@@ -436,6 +463,16 @@ function backToForm(){
   document.getElementById("summary").style.display = "block";
 }
 
+function formatDayAndDate(yyyyMmDd){
+  if(!yyyyMmDd) return "";
+  const d = new Date(yyyyMmDd + "T00:00:00");
+  return d.toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "numeric",
+    day: "numeric"
+  });
+}
+
 function loadTeamStatus(team){
   if(!team) return;
 
@@ -448,8 +485,6 @@ function loadTeamStatus(team){
       const today = new Date();
       today.setHours(0,0,0,0);
 
-      let statusHTML = "<h3>Full Team Pitching Status</h3>";
-
       const latestByName = {};
 
       if(Array.isArray(data)){
@@ -461,31 +496,67 @@ function loadTeamStatus(team){
       const teamRoster = roster[team] || [];
 
       if(teamRoster.length === 0){
-        statusHTML += "No roster found for this team.";
-        document.getElementById("teamStatus").innerHTML = statusHTML;
+        document.getElementById("teamStatus").innerHTML = "No roster found for this team.";
         cleanupJsonp(callbackName);
         return;
       }
 
+      let html = `
+        <h3>Full Team Pitching Status</h3>
+        <table class="dashboard-table">
+          <thead>
+            <tr>
+              <th>Player</th>
+              <th>Status</th>
+              <th>Eligible Date</th>
+              <th>Total Pitches</th>
+              <th>Pitches Last 7 Days</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
       teamRoster.forEach(playerName=>{
         const record = latestByName[playerName];
 
-        if(!record){
-          statusHTML += `<div class="status-good">🟢 ${playerName} — Eligible today (no pitching history entered)</div>`;
-          return;
+        let statusText = `<span class="status-good">Eligible</span>`;
+        let eligibleText = "Today";
+        let totalPitches = 0;
+        let pitchesLast7 = 0;
+
+        if(record){
+          const eligibleDate = new Date(record.eligibleDate + "T00:00:00");
+          const eligible = eligibleDate <= today;
+
+          statusText = eligible
+            ? `<span class="status-good">Eligible</span>`
+            : `<span class="status-bad">Not Eligible</span>`;
+
+          eligibleText = eligible
+            ? "Today"
+            : formatDayAndDate(record.eligibleDate);
+
+          totalPitches = record.totalPitches || 0;
+          pitchesLast7 = record.pitchesLast7 || 0;
         }
 
-        const eligibleDate = new Date(record.eligibleDate + "T00:00:00");
-        const eligible = eligibleDate <= today;
-
-        if(eligible){
-          statusHTML += `<div class="status-good">🟢 ${playerName} — Eligible today</div>`;
-        } else {
-          statusHTML += `<div class="status-bad">🔴 ${playerName} — Next eligible ${eligibleDate.toLocaleDateString()}</div>`;
-        }
+        html += `
+          <tr>
+            <td>${playerName}</td>
+            <td>${statusText}</td>
+            <td>${eligibleText}</td>
+            <td>${totalPitches}</td>
+            <td>${pitchesLast7}</td>
+          </tr>
+        `;
       });
 
-      document.getElementById("teamStatus").innerHTML = statusHTML;
+      html += `
+          </tbody>
+        </table>
+      `;
+
+      document.getElementById("teamStatus").innerHTML = html;
     } finally {
       cleanupJsonp(callbackName);
     }
