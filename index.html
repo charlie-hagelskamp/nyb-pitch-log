@@ -1,487 +1,175 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Noblesville Travel Baseball Pitch Log</title>
 
-  <style>
-    :root{
-      --black:#111111;
-      --gold:#c9a227;
-      --blue:#1e73be;
-      --blue-dark:#155a96;
-      --gray:#e9e9e9;
-      --gray-text:#7a7a7a;
-      --danger:#b42318;
-    }
+<meta name="viewport" content="width=device-width,initial-scale=1">
 
-    *{
-      box-sizing:border-box;
-    }
+<title>Noblesville Travel Baseball Pitch Log</title>
 
-    body{
-      font-family:Arial, sans-serif;
-      max-width:600px;
-      margin:auto;
-      padding:20px;
-      color:var(--black);
-      background:#ffffff;
-    }
+<style>
 
-    .logo{
-      width:120px;
-      display:block;
-      margin:0 auto 10px auto;
-    }
+body{
+font-family:Arial;
+max-width:600px;
+margin:auto;
+padding:20px;
+}
 
-    h1,h2,h3{
-      text-align:center;
-      margin:8px 0;
-    }
+.logo{
+width:120px;
+display:block;
+margin:auto;
+}
 
-    .section{
-      margin-bottom:18px;
-    }
+h1{
+text-align:center;
+}
 
-    label{
-      display:block;
-      font-weight:bold;
-      margin-bottom:6px;
-    }
+button{
+width:100%;
+padding:12px;
+margin:6px 0;
+font-size:16px;
+}
 
-    input,
-    select,
-    textarea{
-      width:100%;
-      padding:12px;
-      font-size:16px;
-      border:1px solid #cfcfcf;
-      border-radius:8px;
-      background:#fff;
-    }
+.player{
+background:#000;
+color:#fff;
+}
 
-    textarea{
-      resize:vertical;
-      min-height:110px;
-    }
+</style>
 
-    .btn,
-    .player-btn,
-    .entry-btn{
-      display:block;
-      width:100%;
-      padding:12px;
-      margin:8px 0;
-      font-size:16px;
-      font-weight:bold;
-      text-align:center;
-      text-decoration:none;
-      border:none;
-      border-radius:8px;
-      cursor:pointer;
-      transition:background .15s ease, opacity .15s ease, transform .05s ease;
-    }
-
-    .btn:active,
-    .player-btn:active,
-    .entry-btn:active{
-      transform:scale(0.99);
-    }
-
-    .btn-primary{
-      background:var(--black);
-      color:#fff;
-    }
-
-    .btn-primary:hover{
-      background:#000;
-    }
-
-    .btn-secondary{
-      background:var(--blue);
-      color:#fff;
-    }
-
-    .btn-secondary:hover{
-      background:var(--blue-dark);
-    }
-
-    .btn-danger{
-      background:var(--danger);
-      color:#fff;
-    }
-
-    .btn-danger:hover{
-      background:#8f1c13;
-    }
-
-    .btn-disabled,
-    button:disabled{
-      background:var(--gray) !important;
-      color:var(--gray-text) !important;
-      cursor:not-allowed !important;
-      opacity:1 !important;
-    }
-
-    .player-grid{
-      margin-top:8px;
-    }
-
-    .player-btn{
-      background:var(--black);
-      color:#fff;
-    }
-
-    .player-btn:hover{
-      background:#000;
-    }
-
-    .muted{
-      color:#666;
-      font-size:14px;
-      margin-top:4px;
-    }
-
-    .hidden{
-      display:none;
-    }
-
-    .log-list{
-      margin-top:10px;
-    }
-
-    .log-card{
-      border:1px solid #d9d9d9;
-      border-radius:8px;
-      padding:12px;
-      margin-bottom:10px;
-      background:#fafafa;
-    }
-
-    .log-row{
-      display:flex;
-      justify-content:space-between;
-      gap:12px;
-      align-items:center;
-      flex-wrap:wrap;
-    }
-
-    .log-name{
-      font-weight:bold;
-    }
-
-    .log-pitches{
-      font-size:15px;
-    }
-
-    .log-actions{
-      display:flex;
-      gap:8px;
-      width:100%;
-      margin-top:10px;
-    }
-
-    .log-actions .entry-btn{
-      margin:0;
-      width:100%;
-      padding:10px;
-      font-size:14px;
-    }
-
-    .empty-state{
-      text-align:center;
-      color:#666;
-      padding:10px 0;
-    }
-
-    .status{
-      text-align:center;
-      margin-top:10px;
-      font-size:14px;
-      color:#444;
-      min-height:20px;
-    }
-  </style>
 </head>
+
 <body>
 
-  <img src="DC5hbQVQ.jpg" class="logo" alt="Noblesville Travel Baseball logo">
+<img src="DC5hbQVQ.jpg" class="logo">
 
-  <h1>Noblesville Travel Baseball</h1>
-  <h2>Game Pitch Log</h2>
+<h1>Noblesville Travel Baseball</h1>
 
-  <a href="dashboard.html" class="btn btn-secondary">Dashboard</a>
+<h2>Game Pitch Log</h2>
 
-  <div class="section">
-    <label for="date">Date</label>
-    <input type="date" id="date">
-  </div>
+Date<br>
+<input type="date" id="date"><br><br>
 
-  <div class="section">
-    <label for="team">Team</label>
-    <select id="team"></select>
-  </div>
+Team<br>
+<select id="team"></select><br><br>
 
-  <div class="section">
-    <label for="opponent">Opponent</label>
-    <input id="opponent" type="text" placeholder="Enter opponent name">
-  </div>
+Opponent<br>
+<input id="opponent"><br><br>
 
-  <div class="section" id="pitchersSection">
-    <label>Pitchers</label>
-    <div class="muted">Tap a player to enter pitch count.</div>
-    <div id="pitchers" class="player-grid"></div>
-  </div>
+<div id="pitchers"></div>
 
-  <div class="section">
-    <h3>Pitch Log</h3>
-    <div id="log" class="log-list"></div>
-  </div>
+<h3>Pitch Log</h3>
 
-  <div class="section">
-    <label for="notes">Game Notes</label>
-    <textarea id="notes" placeholder="Enter game notes"></textarea>
-    <div class="muted">Submit stays disabled until Game Notes are entered.</div>
-  </div>
+<div id="log"></div>
 
-  <button id="submitBtn" class="btn btn-primary btn-disabled" onclick="submitGame()" disabled>Submit</button>
+Game Notes<br>
 
-  <div id="status" class="status"></div>
+<textarea id="notes" rows="4" style="width:100%"></textarea>
 
-  <script>
-    const API = "https://script.google.com/macros/s/AKfycbwdblCmYSuNrFK_Gk-pQIB4fOKncnpvQ24cgaCUfWcVtGXYieMs16O47MvAoja0FPfL/exec";
+<br><br>
 
-    let roster = {};
-    let log = [];
+<button onclick="submitGame()">Submit</button>
 
-    const teamEl = document.getElementById("team");
-    const dateEl = document.getElementById("date");
-    const opponentEl = document.getElementById("opponent");
-    const notesEl = document.getElementById("notes");
-    const submitBtn = document.getElementById("submitBtn");
-    const pitchersDiv = document.getElementById("pitchers");
-    const logDiv = document.getElementById("log");
-    const pitchersSection = document.getElementById("pitchersSection");
-    const statusEl = document.getElementById("status");
+<script>
 
-    async function load(){
-      const res = await fetch("roster.json");
-      roster = await res.json();
+const API="https://script.google.com/macros/s/AKfycbwdblCmYSuNrFK_Gk-pQIB4fOKncnpvQ24cgaCUfWcVtGXYieMs16O47MvAoja0FPfL/exec";
 
-      teamEl.innerHTML = "";
+let roster={}
+let log=[]
 
-      Object.keys(roster).forEach(teamName => {
-        const opt = document.createElement("option");
-        opt.value = teamName;
-        opt.text = teamName;
-        teamEl.appendChild(opt);
-      });
+async function load(){
 
-      teamEl.addEventListener("change", onTeamChange);
-      notesEl.addEventListener("input", updateSubmitState);
+const res=await fetch("roster.json")
+roster=await res.json()
 
-      setDefaultDate();
-      onTeamChange();
-      updateSubmitState();
-    }
+const team=document.getElementById("team")
 
-    function setDefaultDate(){
-      const today = new Date();
-      const y = today.getFullYear();
-      const m = String(today.getMonth() + 1).padStart(2, "0");
-      const d = String(today.getDate()).padStart(2, "0");
-      dateEl.value = `${y}-${m}-${d}`;
-    }
+Object.keys(roster).forEach(t=>{
 
-    function onTeamChange(){
-      log = [];
-      renderLog();
-      renderPlayers();
-      updateSubmitState();
-      statusEl.textContent = "";
-    }
+let opt=document.createElement("option")
+opt.value=t
+opt.text=t
 
-    function renderPlayers(){
-      const team = teamEl.value;
-      pitchersDiv.innerHTML = "";
+team.appendChild(opt)
 
-      if(team.startsWith("7U")){
-        pitchersSection.classList.add("hidden");
-        return;
-      }
+})
 
-      pitchersSection.classList.remove("hidden");
+team.onchange=render
 
-      (roster[team] || []).forEach(player => {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "player-btn";
-        btn.textContent = player;
-        btn.onclick = () => upsertPitcher(player);
-        pitchersDiv.appendChild(btn);
-      });
-    }
+render()
 
-    function upsertPitcher(player){
-      const existing = log.find(entry => entry.name === player);
-      const currentValue = existing ? existing.pitches : "";
-      const response = prompt(`Pitch count for ${player}`, currentValue);
+}
 
-      if(response === null) return;
+function render(){
 
-      const trimmed = String(response).trim();
+const team=document.getElementById("team").value
+const div=document.getElementById("pitchers")
 
-      if(trimmed === ""){
-        return;
-      }
+div.innerHTML=""
 
-      const pitches = Number(trimmed);
+if(team.startsWith("7U")) return
 
-      if(Number.isNaN(pitches) || pitches < 0){
-        alert("Please enter a valid pitch count.");
-        return;
-      }
+roster[team].forEach(p=>{
 
-      if(existing){
-        existing.pitches = pitches;
-      } else {
-        log.push({ name: player, pitches });
-      }
+let btn=document.createElement("button")
 
-      renderLog();
-      updateSubmitState();
-    }
+btn.className="player"
+btn.innerText=p
 
-    function renderLog(){
-      if(log.length === 0){
-        logDiv.innerHTML = `<div class="empty-state">No pitchers entered yet.</div>`;
-        return;
-      }
+btn.onclick=()=>{
 
-      logDiv.innerHTML = "";
+let pitches=prompt("Pitch count for "+p)
 
-      log.forEach((entry, index) => {
-        const card = document.createElement("div");
-        card.className = "log-card";
+if(!pitches) return
 
-        card.innerHTML = `
-          <div class="log-row">
-            <div class="log-name">${escapeHtml(entry.name)}</div>
-            <div class="log-pitches">${entry.pitches} pitches</div>
-          </div>
-          <div class="log-actions">
-            <button type="button" class="entry-btn btn-secondary" data-action="edit" data-index="${index}">Edit</button>
-            <button type="button" class="entry-btn btn-danger" data-action="remove" data-index="${index}">Remove</button>
-          </div>
-        `;
+log.push({name:p,pitches:Number(pitches)})
 
-        logDiv.appendChild(card);
-      });
+update()
 
-      logDiv.querySelectorAll("button").forEach(btn => {
-        btn.addEventListener("click", () => {
-          const index = Number(btn.dataset.index);
-          const action = btn.dataset.action;
+}
 
-          if(action === "edit"){
-            upsertPitcher(log[index].name);
-          }
+div.appendChild(btn)
 
-          if(action === "remove"){
-            log.splice(index, 1);
-            renderLog();
-            updateSubmitState();
-          }
-        });
-      });
-    }
+})
 
-    function updateSubmitState(){
-      const hasNotes = notesEl.value.trim().length > 0;
-      submitBtn.disabled = !hasNotes;
-      submitBtn.classList.toggle("btn-disabled", !hasNotes);
-    }
+}
 
-    async function submitGame(){
-      if(submitBtn.disabled){
-        return;
-      }
+function update(){
 
-      const is7U = teamEl.value.startsWith("7U");
+const div=document.getElementById("log")
 
-      if(!dateEl.value){
-        alert("Please enter a date.");
-        return;
-      }
+div.innerHTML=""
 
-      if(!teamEl.value){
-        alert("Please select a team.");
-        return;
-      }
+log.forEach(l=>{
+div.innerHTML+=`${l.name} — ${l.pitches}<br>`
+})
 
-      if(!opponentEl.value.trim()){
-        alert("Please enter an opponent.");
-        return;
-      }
+}
 
-      if(!notesEl.value.trim()){
-        alert("Please enter game notes.");
-        return;
-      }
+async function submitGame(){
+  const data={
+    date:date.value,
+    team:team.value,
+    opponent:opponent.value,
+    notes:notes.value,
+    pitchers:log
+  }
+  await fetch(API,{
+    method:"POST",
+    mode:"no-cors",
+    headers:{"Content-Type":"text/plain"},
+    body:JSON.stringify(data)
+  })
+  alert("Game Submitted")
+  log=[]
+  update()
+}
 
-      if(!is7U && log.length === 0){
-        alert("Please enter at least one pitcher.");
-        return;
-      }
+load()
 
-      const data = {
-        date: dateEl.value,
-        team: teamEl.value,
-        opponent: opponentEl.value.trim(),
-        notes: notesEl.value.trim(),
-        pitchers: log
-      };
+</script>
 
-      try{
-        submitBtn.disabled = true;
-        submitBtn.classList.add("btn-disabled");
-        statusEl.textContent = "Submitting...";
-
-        await fetch(API, {
-          method: "POST",
-          mode: "no-cors",
-          headers: {
-            "Content-Type": "text/plain"
-          },
-          body: JSON.stringify(data)
-        });
-
-        alert("Game Submitted");
-
-        opponentEl.value = "";
-        notesEl.value = "";
-        log = [];
-        renderLog();
-        updateSubmitState();
-        statusEl.textContent = "Submitted.";
-      } catch (err){
-        console.error(err);
-        statusEl.textContent = "Submission failed.";
-        alert("Something went wrong while submitting.");
-        updateSubmitState();
-      }
-    }
-
-    function escapeHtml(str){
-      return String(str)
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
-    }
-
-    load();
-  </script>
 </body>
 </html>
