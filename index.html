@@ -17,20 +17,34 @@ body{
   align-items:center;
   justify-content:space-between;
   margin-bottom:20px;
+  gap:12px;
+  flex-wrap:wrap;
+}
+
+.header-left{
+  display:flex;
+  align-items:center;
+  gap:15px;
+  flex:1 1 auto;
+  min-width:0;
 }
 
 .header img.logo{
   width:80px;
-  margin-right:15px;
 }
 
 .header h1{
   font-size:1.5em;
   margin:0;
-  flex-grow:1;
 }
 
-.header a.dashboard-link{
+.header-actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+.header a.action-link{
   text-decoration:none;
   background:#0077cc;
   color:#fff;
@@ -41,7 +55,7 @@ body{
   display:inline-block;
 }
 
-.header a.dashboard-link:hover{
+.header a.action-link:hover{
   background:#005fa3;
 }
 
@@ -95,13 +109,14 @@ button:disabled{
   padding:2px 6px;
   border-radius:3px;
   cursor:pointer;
+  width:auto;
 }
 
 .log-remove-btn:hover{
   background:#f55;
 }
 
-#summary,#dashboard{
+#summary,#dashboard,#gameNotesLogs{
   margin-top:12px;
   padding:10px;
   background:#eef;
@@ -190,40 +205,35 @@ button:disabled{
   background:#dfe8f7;
 }
 
-.pitchsmart-box{
-  margin-top:20px;
-  padding:14px;
-  background:#f7f7f7;
-  border:1px solid #ccc;
+.notes-card{
+  background:#fff;
+  border:1px solid #cfd8ea;
   border-radius:6px;
-}
-
-.pitchsmart-box h3{
-  margin-top:0;
-  margin-bottom:10px;
-}
-
-.pitchsmart-box table{
-  width:100%;
-  border-collapse:collapse;
+  padding:12px;
   margin-top:10px;
-  font-size:14px;
 }
 
-.pitchsmart-box th,
-.pitchsmart-box td{
-  border:1px solid #ccc;
-  padding:8px;
-  text-align:left;
-  vertical-align:top;
+.notes-card-date{
+  font-weight:bold;
+  margin-bottom:6px;
 }
 
-.pitchsmart-box th{
-  background:#e9eef7;
+.notes-card-opp{
+  color:#333;
+  margin-bottom:8px;
 }
 
-.pitchsmart-note{
+.notes-card-text{
+  white-space:pre-wrap;
+  line-height:1.4;
+}
+
+.empty-message{
   margin-top:12px;
+  background:#fff;
+  border:1px solid #cfd8ea;
+  border-radius:6px;
+  padding:12px;
 }
 
 @media (max-width:700px){
@@ -235,13 +245,21 @@ button:disabled{
     padding:6px;
   }
 
-  .pitchsmart-box table{
-    font-size:12px;
+  .header{
+    align-items:flex-start;
   }
 
-  .pitchsmart-box th,
-  .pitchsmart-box td{
-    padding:6px;
+  .header-left{
+    width:100%;
+  }
+
+  .header-actions{
+    width:100%;
+  }
+
+  .header a.action-link{
+    flex:1 1 auto;
+    text-align:center;
   }
 }
 </style>
@@ -250,9 +268,14 @@ button:disabled{
 <body>
 
 <div class="header">
-  <img src="DC5hbQVQ.jpg" class="logo">
-  <h1>Noblesville Travel Baseball</h1>
-  <a href="#" class="dashboard-link" onclick="showDashboard(); return false;">Dashboard</a>
+  <div class="header-left">
+    <img src="DC5hbQVQ.jpg" class="logo">
+    <h1>Noblesville Travel Baseball</h1>
+  </div>
+  <div class="header-actions">
+    <a href="#" class="action-link" onclick="showDashboard(); return false;">Dashboard</a>
+    <a href="#" class="action-link" onclick="showGameNotesLogs(); return false;">Game Notes Logs</a>
+  </div>
 </div>
 
 <h2>Game Pitch Log</h2>
@@ -278,52 +301,11 @@ button:disabled{
   <textarea id="notes" rows="4"></textarea>
 
   <button id="submitBtn" onclick="submitGame()">Submit</button>
-
-  <div class="pitchsmart-box">
-    <h3>Pitch Smart Guidelines</h3>
-
-    <table>
-      <thead>
-        <tr>
-          <th>Pitches in a Day</th>
-          <th>Required Rest</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>1-20</td>
-          <td>0 days</td>
-        </tr>
-        <tr>
-          <td>21-35</td>
-          <td>1 day</td>
-        </tr>
-        <tr>
-          <td>36-50</td>
-          <td>2 days</td>
-        </tr>
-        <tr>
-          <td>51-65</td>
-          <td>3 days</td>
-        </tr>
-        <tr>
-          <td>66+</td>
-          <td>4 days</td>
-        </tr>
-      </tbody>
-    </table>
-
-    <div class="pitchsmart-note">
-      <strong>Notes:</strong><br>
-      9-10 year olds: 75 pitches max in a day<br>
-      11-12 year olds: 85 pitches max in a day<br>
-      No pitcher should pitch on 3 consecutive days
-    </div>
-  </div>
 </div>
 
 <div id="summary"></div>
 <div id="dashboard" style="display:none;"></div>
+<div id="gameNotesLogs" style="display:none;"></div>
 
 <div id="pitchModal" class="modal">
   <div class="modal-content">
@@ -446,7 +428,7 @@ function update(){
 
   log.forEach(l=>{
     div.innerHTML += `${l.name} — ${l.pitches}
-    <button class="log-remove-btn" onclick="removeFromLog('${l.name}')">Remove</button><br>`;
+    <button class="log-remove-btn" onclick="removeFromLog('${escapeSingleQuotes(l.name)}')">Remove</button><br>`;
   });
 }
 
@@ -469,13 +451,19 @@ function removeFromLog(name){
 
 async function submitGame(){
   const notes = document.getElementById("notes").value.trim();
+  const team = document.getElementById("team").value;
 
   if(!notes){
     alert("Please enter Game Notes");
     return;
   }
 
-  if(log.length === 0){
+  if(!team){
+    alert("Please select a team");
+    return;
+  }
+
+  if(!team.startsWith("7U") && log.length === 0){
     alert("No pitchers added");
     return;
   }
@@ -486,7 +474,7 @@ async function submitGame(){
 
   const data = {
     date: document.getElementById("date").value,
-    team: document.getElementById("team").value,
+    team: team,
     opponent: document.getElementById("opponent").value,
     notes: notes,
     pitchers: log
@@ -502,9 +490,13 @@ async function submitGame(){
     const summaryDiv = document.getElementById("summary");
     summaryDiv.innerHTML = "<strong>Pitchers submitted:</strong><br>";
 
-    data.pitchers.forEach(p=>{
-      summaryDiv.innerHTML += `${p.name} — ${p.pitches} pitches, ${p.restDays} rest days<br>`;
-    });
+    if(data.pitchers.length){
+      data.pitchers.forEach(p=>{
+        summaryDiv.innerHTML += `${p.name} — ${p.pitches} pitches, ${p.restDays} rest days<br>`;
+      });
+    } else {
+      summaryDiv.innerHTML += `No pitchers for this team entry.<br>`;
+    }
 
     document.getElementById("opponent").value = "";
     document.getElementById("notes").value = "";
@@ -524,6 +516,7 @@ async function submitGame(){
 function showDashboard(){
   document.getElementById("form-section").style.display = "none";
   document.getElementById("summary").style.display = "none";
+  document.getElementById("gameNotesLogs").style.display = "none";
 
   const dash = document.getElementById("dashboard");
   dash.style.display = "block";
@@ -553,8 +546,42 @@ function showDashboard(){
   sel.onchange = ()=>loadTeamStatus(sel.value);
 }
 
+function showGameNotesLogs(){
+  document.getElementById("form-section").style.display = "none";
+  document.getElementById("summary").style.display = "none";
+  document.getElementById("dashboard").style.display = "none";
+
+  const notesView = document.getElementById("gameNotesLogs");
+  notesView.style.display = "block";
+
+  notesView.innerHTML = `
+    <button onclick="backToForm()">⬅ Back to Game Submission</button>
+
+    <h3>Game Notes Logs</h3>
+
+    Select Team<br>
+    <select id="notesTeam">
+      <option value="">Select a team</option>
+    </select>
+
+    <div id="notesResults" style="margin-top:15px;"></div>
+  `;
+
+  const sel = document.getElementById("notesTeam");
+
+  Object.keys(roster).forEach(t=>{
+    let o = document.createElement("option");
+    o.value = t;
+    o.text = t;
+    sel.appendChild(o);
+  });
+
+  sel.onchange = ()=>loadGameNotesLogs(sel.value);
+}
+
 function backToForm(){
   document.getElementById("dashboard").style.display = "none";
+  document.getElementById("gameNotesLogs").style.display = "none";
   document.getElementById("form-section").style.display = "block";
   document.getElementById("summary").style.display = "block";
 }
@@ -670,10 +697,70 @@ function loadTeamStatus(team){
   document.body.appendChild(script);
 }
 
+function loadGameNotesLogs(team){
+  if(!team) return;
+
+  document.getElementById("notesResults").innerHTML = "Loading...";
+
+  const callbackName = "gameNotesCallback_" + Date.now();
+
+  window[callbackName] = function(data){
+    try{
+      const target = document.getElementById("notesResults");
+
+      if(!Array.isArray(data) || data.length === 0){
+        target.innerHTML = `<div class="empty-message">No game notes found for this team.</div>`;
+        cleanupJsonp(callbackName);
+        return;
+      }
+
+      let html = "";
+
+      data.forEach(item=>{
+        html += `
+          <div class="notes-card">
+            <div class="notes-card-date">${formatDayAndDate(item.date)}</div>
+            <div class="notes-card-opp"><strong>Opponent:</strong> ${escapeHtml(item.opponent || "")}</div>
+            <div class="notes-card-text">${escapeHtml(item.notes || "")}</div>
+          </div>
+        `;
+      });
+
+      target.innerHTML = html;
+    } finally {
+      cleanupJsonp(callbackName);
+    }
+  };
+
+  const script = document.createElement("script");
+  script.id = callbackName;
+  script.src = API + "?notesTeam=" + encodeURIComponent(team) + "&callback=" + callbackName;
+  script.onerror = function(){
+    document.getElementById("notesResults").innerHTML =
+      `<div class="status-bad">Error loading game notes.</div>`;
+    cleanupJsonp(callbackName);
+  };
+
+  document.body.appendChild(script);
+}
+
 function cleanupJsonp(callbackName){
   const script = document.getElementById(callbackName);
   if(script) script.remove();
   delete window[callbackName];
+}
+
+function escapeHtml(str){
+  return String(str)
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#39;");
+}
+
+function escapeSingleQuotes(str){
+  return String(str).replaceAll("'","\\'");
 }
 
 load();
