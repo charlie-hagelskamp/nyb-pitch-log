@@ -236,6 +236,43 @@ button:disabled{
   padding:12px;
 }
 
+.pitchsmart-box{
+  margin-top:20px;
+  padding:12px;
+  background:#fff;
+  border:1px solid #cfd8ea;
+  border-radius:6px;
+}
+
+.pitchsmart-box h3{
+  margin-top:0;
+  margin-bottom:10px;
+}
+
+.pitchsmart-table{
+  width:100%;
+  border-collapse:collapse;
+  margin-top:8px;
+  font-size:14px;
+}
+
+.pitchsmart-table th,
+.pitchsmart-table td{
+  border:1px solid #ccc;
+  padding:8px;
+  text-align:left;
+  vertical-align:top;
+}
+
+.pitchsmart-table th{
+  background:#dfe8f7;
+}
+
+.pitchsmart-notes{
+  margin-top:12px;
+  line-height:1.5;
+}
+
 @media (max-width:700px){
   .dashboard-table{
     font-size:12px;
@@ -260,6 +297,15 @@ button:disabled{
   .header a.action-link{
     flex:1 1 auto;
     text-align:center;
+  }
+
+  .pitchsmart-table{
+    font-size:12px;
+  }
+
+  .pitchsmart-table th,
+  .pitchsmart-table td{
+    padding:6px;
   }
 }
 </style>
@@ -301,6 +347,48 @@ button:disabled{
   <textarea id="notes" rows="4"></textarea>
 
   <button id="submitBtn" onclick="submitGame()">Submit</button>
+
+  <div class="pitchsmart-box">
+    <h3>Pitch Smart Guidelines</h3>
+
+    <table class="pitchsmart-table">
+      <thead>
+        <tr>
+          <th>Pitches in a Day</th>
+          <th>Required Rest</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1-20</td>
+          <td>0 days</td>
+        </tr>
+        <tr>
+          <td>21-35</td>
+          <td>1 day</td>
+        </tr>
+        <tr>
+          <td>36-50</td>
+          <td>2 days</td>
+        </tr>
+        <tr>
+          <td>51-65</td>
+          <td>3 days</td>
+        </tr>
+        <tr>
+          <td>66+</td>
+          <td>4 days</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="pitchsmart-notes">
+      <strong>Notes:</strong><br>
+      9-10 year olds: 75 pitches max per day<br>
+      11-12 year olds: 85 pitches max per day<br>
+      No pitcher should pitch on 3 consecutive days
+    </div>
+  </div>
 </div>
 
 <div id="summary"></div>
