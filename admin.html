@@ -7,7 +7,7 @@
 <style>
 body{
   font-family:Arial;
-  max-width:1100px;
+  max-width:1300px;
   margin:auto;
   padding:20px;
   background:#f7f9fc;
@@ -46,7 +46,8 @@ body{
 }
 
 .header a.action-link,
-.refresh-btn{
+.refresh-btn,
+.sync-btn{
   text-decoration:none;
   background:#0077cc;
   color:#fff;
@@ -60,8 +61,17 @@ body{
 }
 
 .header a.action-link:hover,
-.refresh-btn:hover{
+.refresh-btn:hover,
+.sync-btn:hover{
   background:#005fa3;
+}
+
+.sync-btn{
+  background:#198754;
+}
+
+.sync-btn:hover{
+  background:#146c43;
 }
 
 .section{
@@ -78,10 +88,20 @@ body{
   font-size:1.2em;
 }
 
+.section h3{
+  margin-top:0;
+  margin-bottom:10px;
+  font-size:1.05em;
+}
+
 .cards{
   display:grid;
-  grid-template-columns:repeat(3, minmax(0,1fr));
+  grid-template-columns:repeat(4, minmax(0,1fr));
   gap:12px;
+}
+
+.cards.three{
+  grid-template-columns:repeat(3, minmax(0,1fr));
 }
 
 .card{
@@ -100,6 +120,12 @@ body{
 .card-value{
   font-size:28px;
   font-weight:bold;
+}
+
+.grid-2{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:16px;
 }
 
 .table-wrap{
@@ -153,11 +179,21 @@ th{
   margin-top:8px;
 }
 
-@media (max-width:700px){
-  .cards{
+.sync-status{
+  margin-top:10px;
+  font-size:13px;
+  color:#444;
+}
+
+@media (max-width:900px){
+  .cards,
+  .cards.three,
+  .grid-2{
     grid-template-columns:1fr;
   }
+}
 
+@media (max-width:700px){
   th, td{
     font-size:12px;
     padding:8px;
@@ -176,7 +212,8 @@ th{
   }
 
   .header a.action-link,
-  .refresh-btn{
+  .refresh-btn,
+  .sync-btn{
     flex:1 1 auto;
     text-align:center;
   }
@@ -194,32 +231,46 @@ th{
 
   <div class="header-actions">
     <a href="index.html" class="action-link">Coach Page</a>
+    <button class="sync-btn" onclick="runGcSync()">Run GC Sync</button>
     <button class="refresh-btn" onclick="loadAdminPage()">Refresh</button>
   </div>
 </div>
 
+<div id="syncStatus" class="sync-status"></div>
+
 <div class="section">
-  <h2>Organization Summary</h2>
-  <div id="summaryCards" class="cards">
-    <div class="card">
-      <div class="card-label">Org Record</div>
-      <div class="card-value">-</div>
+  <h2>Performance Summary</h2>
+
+  <div style="margin-bottom:16px;">
+    <h3>Overall Organization</h3>
+    <div id="overallOrgCards" class="cards four loading">Loading...</div>
+  </div>
+
+  <div class="grid-2">
+    <div>
+      <h3>Current Week (Monday-Sunday)</h3>
+      <div id="currentWeekOrgCards" class="cards four loading">Loading...</div>
     </div>
-    <div class="card">
-      <div class="card-label">Completed Games</div>
-      <div class="card-value">-</div>
-    </div>
-    <div class="card">
-      <div class="card-label">Missing Submissions</div>
-      <div class="card-value">-</div>
+    <div>
+      <h3>Previous Week (Monday-Sunday)</h3>
+      <div id="previousWeekOrgCards" class="cards four loading">Loading...</div>
     </div>
   </div>
-  <div class="footer-note">Currently based on synced completed GameChanger games and submission checks from April 18, 2026 and newer.</div>
+
+  <div class="footer-note">
+    Overall stats are based on all completed GameChanger games. Weekly stats use Monday-Sunday windows.
+  </div>
 </div>
 
 <div class="section">
-  <h2>Team Summary</h2>
-  <div id="teamSummary" class="loading">Loading...</div>
+  <h2>Team Performance</h2>
+  <div id="teamPerformance" class="loading">Loading...</div>
+</div>
+
+<div class="section">
+  <h2>Submission Summary</h2>
+  <div id="submissionCards" class="cards four loading">Loading...</div>
+  <div id="submissionNote" class="footer-note"></div>
 </div>
 
 <div class="section">
@@ -231,17 +282,23 @@ th{
 const API = "https://script.google.com/macros/s/AKfycbwYw3hAF-O6qeiDkR9pb10OuwgXc8PrX48ZiRj2KCcrkAaPfFj9dJG4YXesRe4rsUc4/exec";
 
 function loadAdminPage(){
-  loadAdminSummary();
+  document.getElementById("syncStatus").textContent = "";
+  loadPerformanceSummary();
+  loadSubmissionSummary();
   loadMissingSubmissions();
 }
 
-function loadAdminSummary(){
-  const callbackName = "adminSummaryCallback_" + Date.now();
+function loadPerformanceSummary(){
+  const callbackName = "performanceSummaryCallback_" + Date.now();
 
   window[callbackName] = function(data){
     try{
-      renderSummaryCards(data || {});
-      renderTeamSummary((data && data.teams) ? data.teams : []);
+      if(data && data.error){
+        renderPerformanceError(data.message || "Error loading performance summary.");
+        return;
+      }
+
+      renderPerformanceSummary(data || {});
     } finally {
       cleanupJsonp(callbackName);
     }
@@ -249,12 +306,36 @@ function loadAdminSummary(){
 
   const script = document.createElement("script");
   script.id = callbackName;
-  script.src = API + "?adminSummary=1&callback=" + callbackName;
+  script.src = API + "?performanceSummary=1&callback=" + callbackName;
   script.onerror = function(){
-    document.getElementById("summaryCards").innerHTML = `
-      <div class="card"><div class="card-label">Error</div><div class="card-value">-</div></div>
-    `;
-    document.getElementById("teamSummary").innerHTML = `<div class="empty">Error loading summary.</div>`;
+    renderPerformanceError("Error loading performance summary.");
+    cleanupJsonp(callbackName);
+  };
+
+  document.body.appendChild(script);
+}
+
+function loadSubmissionSummary(){
+  const callbackName = "submissionSummaryCallback_" + Date.now();
+
+  window[callbackName] = function(data){
+    try{
+      if(data && data.error){
+        renderSubmissionError(data.message || "Error loading submission summary.");
+        return;
+      }
+
+      renderSubmissionSummary(data || {});
+    } finally {
+      cleanupJsonp(callbackName);
+    }
+  };
+
+  const script = document.createElement("script");
+  script.id = callbackName;
+  script.src = API + "?submissionSummary=1&callback=" + callbackName;
+  script.onerror = function(){
+    renderSubmissionError("Error loading submission summary.");
     cleanupJsonp(callbackName);
   };
 
@@ -283,32 +364,97 @@ function loadMissingSubmissions(){
   document.body.appendChild(script);
 }
 
-function renderSummaryCards(data){
-  const orgRecord = data.orgRecordLast7 || "-";
-  const completed = data.totalCompletedLast7 != null ? data.totalCompletedLast7 : "-";
-  const missing = data.missingSubmissionsLast7 != null ? data.missingSubmissionsLast7 : "-";
+function runGcSync(){
+  const callbackName = "runGcSyncCallback_" + Date.now();
+  document.getElementById("syncStatus").textContent = "Running GameChanger sync...";
 
-  document.getElementById("summaryCards").innerHTML = `
+  window[callbackName] = function(data){
+    try{
+      if(data && data.success){
+        document.getElementById("syncStatus").textContent =
+          `Sync completed at ${escapeHtml(data.ranAt || "")}`;
+        loadAdminPage();
+      } else {
+        document.getElementById("syncStatus").textContent =
+          `Sync failed: ${escapeHtml((data && data.message) || "Unknown error")}`;
+      }
+    } finally {
+      cleanupJsonp(callbackName);
+    }
+  };
+
+  const script = document.createElement("script");
+  script.id = callbackName;
+  script.src = API + "?runGcSync=1&callback=" + callbackName;
+  script.onerror = function(){
+    document.getElementById("syncStatus").textContent = "Sync failed.";
+    cleanupJsonp(callbackName);
+  };
+
+  document.body.appendChild(script);
+}
+
+function renderPerformanceSummary(data){
+  const overallOrg = data.overallOrg || {};
+  const currentWeekOrg = data.currentWeekOrg || {};
+  const previousWeekOrg = data.previousWeekOrg || {};
+  const teams = Array.isArray(data.teams) ? data.teams : [];
+
+  document.getElementById("overallOrgCards").innerHTML = buildStatCardsHtml(overallOrg, false);
+  document.getElementById("currentWeekOrgCards").innerHTML = buildStatCardsHtml(currentWeekOrg, true);
+  document.getElementById("previousWeekOrgCards").innerHTML = buildStatCardsHtml(previousWeekOrg, true);
+
+  renderTeamPerformance(teams);
+}
+
+function renderPerformanceError(message){
+  document.getElementById("overallOrgCards").innerHTML = `<div class="empty">${escapeHtml(message)}</div>`;
+  document.getElementById("currentWeekOrgCards").innerHTML = `<div class="empty">${escapeHtml(message)}</div>`;
+  document.getElementById("previousWeekOrgCards").innerHTML = `<div class="empty">${escapeHtml(message)}</div>`;
+  document.getElementById("teamPerformance").innerHTML = `<div class="empty">${escapeHtml(message)}</div>`;
+}
+
+function buildStatCardsHtml(stats, includeWindow){
+  const record = buildRecordText(stats);
+  const games = Number(stats.completedGames || 0);
+  const runsScored = Number(stats.runsScored || 0);
+  const runsAllowed = Number(stats.runsAllowed || 0);
+
+  let html = `
     <div class="card">
-      <div class="card-label">Org Record</div>
-      <div class="card-value">${escapeHtml(orgRecord)}</div>
+      <div class="card-label">Record</div>
+      <div class="card-value">${escapeHtml(record)}</div>
     </div>
     <div class="card">
       <div class="card-label">Completed Games</div>
-      <div class="card-value">${escapeHtml(String(completed))}</div>
+      <div class="card-value">${escapeHtml(String(games))}</div>
     </div>
     <div class="card">
-      <div class="card-label">Missing Submissions</div>
-      <div class="card-value">${escapeHtml(String(missing))}</div>
+      <div class="card-label">Runs Scored</div>
+      <div class="card-value">${escapeHtml(String(runsScored))}</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Runs Allowed</div>
+      <div class="card-value">${escapeHtml(String(runsAllowed))}</div>
     </div>
   `;
+
+  if(includeWindow && stats.startDate && stats.endDate){
+    html += `
+      <div class="footer-note" style="grid-column:1 / -1;">
+        ${escapeHtml(formatDate(stats.startDate))} through ${escapeHtml(formatDate(stats.endDate))}
+      </div>
+    `;
+  }
+
+  return html;
 }
 
-function renderTeamSummary(teams){
-  const target = document.getElementById("teamSummary");
+function renderTeamPerformance(teams){
+  const target = document.getElementById("teamPerformance");
 
   if(!teams.length){
-    target.innerHTML = `<div class="empty">No team summary data found.</div>`;
+    target.innerHTML = `<div class="empty">No team performance data found.</div>`;
     return;
   }
 
@@ -318,20 +464,37 @@ function renderTeamSummary(teams){
         <thead>
           <tr>
             <th>Team</th>
-            <th>Record</th>
-            <th>Completed Games</th>
+            <th>Overall Record</th>
+            <th>Overall RS</th>
+            <th>Overall RA</th>
+            <th>Current Week</th>
+            <th>Current RS</th>
+            <th>Current RA</th>
+            <th>Previous Week</th>
+            <th>Previous RS</th>
+            <th>Previous RA</th>
           </tr>
         </thead>
         <tbody>
   `;
 
   teams.forEach(team => {
-    const record = buildRecordText(team);
+    const overall = team.overall || {};
+    const currentWeek = team.currentWeek || {};
+    const previousWeek = team.previousWeek || {};
+
     html += `
       <tr>
         <td>${escapeHtml(team.team || "")}</td>
-        <td>${escapeHtml(record)}</td>
-        <td>${escapeHtml(String(team.completedGames || 0))}</td>
+        <td>${escapeHtml(buildRecordText(overall))}</td>
+        <td>${escapeHtml(String(overall.runsScored || 0))}</td>
+        <td>${escapeHtml(String(overall.runsAllowed || 0))}</td>
+        <td>${escapeHtml(buildRecordText(currentWeek))}</td>
+        <td>${escapeHtml(String(currentWeek.runsScored || 0))}</td>
+        <td>${escapeHtml(String(currentWeek.runsAllowed || 0))}</td>
+        <td>${escapeHtml(buildRecordText(previousWeek))}</td>
+        <td>${escapeHtml(String(previousWeek.runsScored || 0))}</td>
+        <td>${escapeHtml(String(previousWeek.runsAllowed || 0))}</td>
       </tr>
     `;
   });
@@ -343,6 +506,40 @@ function renderTeamSummary(teams){
   `;
 
   target.innerHTML = html;
+}
+
+function renderSubmissionSummary(data){
+  const completedGames = Number(data.completedGames || 0);
+  const ntbSubmissions = Number(data.ntbSubmissions || 0);
+  const missingSubmissions = Number(data.missingSubmissions || 0);
+  const extraSubmissions = Number(data.extraSubmissions || 0);
+
+  document.getElementById("submissionCards").innerHTML = `
+    <div class="card">
+      <div class="card-label">Completed GC Games</div>
+      <div class="card-value">${escapeHtml(String(completedGames))}</div>
+    </div>
+    <div class="card">
+      <div class="card-label">NTB Submissions</div>
+      <div class="card-value">${escapeHtml(String(ntbSubmissions))}</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Missing Submissions</div>
+      <div class="card-value">${escapeHtml(String(missingSubmissions))}</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Extra Submissions</div>
+      <div class="card-value">${escapeHtml(String(extraSubmissions))}</div>
+    </div>
+  `;
+
+  document.getElementById("submissionNote").textContent =
+    `Submission tracking is based on GC_Submission_Check from ${data.compareStartDate || ""} and newer.`;
+}
+
+function renderSubmissionError(message){
+  document.getElementById("submissionCards").innerHTML = `<div class="empty">${escapeHtml(message)}</div>`;
+  document.getElementById("submissionNote").textContent = "";
 }
 
 function renderMissingSubmissions(items){
@@ -388,10 +585,10 @@ function renderMissingSubmissions(items){
   target.innerHTML = html;
 }
 
-function buildRecordText(team){
-  const wins = Number(team.wins || 0);
-  const losses = Number(team.losses || 0);
-  const ties = Number(team.ties || 0);
+function buildRecordText(stats){
+  const wins = Number(stats.wins || 0);
+  const losses = Number(stats.losses || 0);
+  const ties = Number(stats.ties || 0);
 
   if(ties > 0){
     return `${wins}-${losses}-${ties}`;
