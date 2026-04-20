@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Noblesville Travel Baseball Admin</title>
+
+<style>
+body{
+  font-family:Arial;
+  max-width:1100px;
+  margin:auto;
+  padding:20px;
+  background:#f7f9fc;
+  color:#222;
+}
+
+.header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:20px;
+  gap:12px;
+  flex-wrap:wrap;
+}
+
+.header-left{
+  display:flex;
+  align-items:center;
+  gap:15px;
+  min-width:0;
+}
+
+.header img.logo{
+  width:80px;
+}
+
+.header h1{
+  font-size:1.6em;
+  margin:0;
+}
+
+.header-actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+.header a.action-link,
+.refresh-btn{
+  text-decoration:none;
+  background:#0077cc;
+  color:#fff;
+  padding:10px 14px;
+  border-radius:4px;
+  font-size:14px;
+  font-weight:bold;
+  display:inline-block;
+  border:none;
+  cursor:pointer;
+}
+
+.header a.action-link:hover,
+.refresh-btn:hover{
+  background:#005fa3;
+}
+
+.section{
+  background:#fff;
+  border:1px solid #d9e1ef;
+  border-radius:8px;
+  padding:16px;
+  margin-bottom:18px;
+}
+
+.section h2{
+  margin-top:0;
+  margin-bottom:12px;
+  font-size:1.2em;
+}
+
+.cards{
+  display:grid;
+  grid-template-columns:repeat(3, minmax(0,1fr));
+  gap:12px;
+}
+
+.card{
+  background:#eef4fb;
+  border:1px solid #d3dfef;
+  border-radius:8px;
+  padding:14px;
+}
+
+.card-label{
+  font-size:13px;
+  color:#555;
+  margin-bottom:8px;
+}
+
+.card-value{
+  font-size:28px;
+  font-weight:bold;
+}
+
+.table-wrap{
+  overflow-x:auto;
+}
+
+table{
+  width:100%;
+  border-collapse:collapse;
+}
+
+th, td{
+  border:1px solid #d5dbe7;
+  padding:10px;
+  text-align:left;
+  vertical-align:top;
+  font-size:14px;
+}
+
+th{
+  background:#e7effa;
+}
+
+.status-good{
+  color:green;
+  font-weight:bold;
+}
+
+.status-bad{
+  color:#b42318;
+  font-weight:bold;
+}
+
+.empty{
+  color:#666;
+  font-style:italic;
+}
+
+.small{
+  font-size:13px;
+  color:#555;
+}
+
+.loading{
+  color:#555;
+}
+
+.footer-note{
+  font-size:12px;
+  color:#666;
+  margin-top:8px;
+}
+
+@media (max-width:700px){
+  .cards{
+    grid-template-columns:1fr;
+  }
+
+  th, td{
+    font-size:12px;
+    padding:8px;
+  }
+
+  .header{
+    align-items:flex-start;
+  }
+
+  .header-left{
+    width:100%;
+  }
+
+  .header-actions{
+    width:100%;
+  }
+
+  .header a.action-link,
+  .refresh-btn{
+    flex:1 1 auto;
+    text-align:center;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <img src="DC5hbQVQ.jpg" class="logo" alt="Noblesville Travel Baseball">
+    <h1>Noblesville Travel Baseball Admin</h1>
+  </div>
+
+  <div class="header-actions">
+    <a href="index.html" class="action-link">Coach Page</a>
+    <button class="refresh-btn" onclick="loadAdminPage()">Refresh</button>
+  </div>
+</div>
+
+<div class="section">
+  <h2>Organization Summary</h2>
+  <div id="summaryCards" class="cards">
+    <div class="card">
+      <div class="card-label">Org Record</div>
+      <div class="card-value">-</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Completed Games</div>
+      <div class="card-value">-</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Missing Submissions</div>
+      <div class="card-value">-</div>
+    </div>
+  </div>
+  <div class="footer-note">Currently based on synced completed GameChanger games and submission checks from April 18, 2026 and newer.</div>
+</div>
+
+<div class="section">
+  <h2>Team Summary</h2>
+  <div id="teamSummary" class="loading">Loading...</div>
+</div>
+
+<div class="section">
+  <h2>Missing Submissions</h2>
+  <div id="missingSummary" class="loading">Loading...</div>
+</div>
+
+<script>
+const API = "https://script.google.com/macros/s/AKfycbwYw3hAF-O6qeiDkR9pb10OuwgXc8PrX48ZiRj2KCcrkAaPfFj9dJG4YXesRe4rsUc4/exec";
+
+function loadAdminPage(){
+  loadAdminSummary();
+  loadMissingSubmissions();
+}
+
+function loadAdminSummary(){
+  const callbackName = "adminSummaryCallback_" + Date.now();
+
+  window[callbackName] = function(data){
+    try{
+      renderSummaryCards(data || {});
+      renderTeamSummary((data && data.teams) ? data.teams : []);
+    } finally {
+      cleanupJsonp(callbackName);
+    }
+  };
+
+  const script = document.createElement("script");
+  script.id = callbackName;
+  script.src = API + "?adminSummary=1&callback=" + callbackName;
+  script.onerror = function(){
+    document.getElementById("summaryCards").innerHTML = `
+      <div class="card"><div class="card-label">Error</div><div class="card-value">-</div></div>
+    `;
+    document.getElementById("teamSummary").innerHTML = `<div class="empty">Error loading summary.</div>`;
+    cleanupJsonp(callbackName);
+  };
+
+  document.body.appendChild(script);
+}
+
+function loadMissingSubmissions(){
+  const callbackName = "adminMissingCallback_" + Date.now();
+
+  window[callbackName] = function(data){
+    try{
+      renderMissingSubmissions(Array.isArray(data) ? data : []);
+    } finally {
+      cleanupJsonp(callbackName);
+    }
+  };
+
+  const script = document.createElement("script");
+  script.id = callbackName;
+  script.src = API + "?adminMissing=1&callback=" + callbackName;
+  script.onerror = function(){
+    document.getElementById("missingSummary").innerHTML = `<div class="empty">Error loading missing submissions.</div>`;
+    cleanupJsonp(callbackName);
+  };
+
+  document.body.appendChild(script);
+}
+
+function renderSummaryCards(data){
+  const orgRecord = data.orgRecordLast7 || "-";
+  const completed = data.totalCompletedLast7 != null ? data.totalCompletedLast7 : "-";
+  const missing = data.missingSubmissionsLast7 != null ? data.missingSubmissionsLast7 : "-";
+
+  document.getElementById("summaryCards").innerHTML = `
+    <div class="card">
+      <div class="card-label">Org Record</div>
+      <div class="card-value">${escapeHtml(orgRecord)}</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Completed Games</div>
+      <div class="card-value">${escapeHtml(String(completed))}</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Missing Submissions</div>
+      <div class="card-value">${escapeHtml(String(missing))}</div>
+    </div>
+  `;
+}
+
+function renderTeamSummary(teams){
+  const target = document.getElementById("teamSummary");
+
+  if(!teams.length){
+    target.innerHTML = `<div class="empty">No team summary data found.</div>`;
+    return;
+  }
+
+  let html = `
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Team</th>
+            <th>Record</th>
+            <th>Completed Games</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+
+  teams.forEach(team => {
+    const record = buildRecordText(team);
+    html += `
+      <tr>
+        <td>${escapeHtml(team.team || "")}</td>
+        <td>${escapeHtml(record)}</td>
+        <td>${escapeHtml(String(team.completedGames || 0))}</td>
+      </tr>
+    `;
+  });
+
+  html += `
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  target.innerHTML = html;
+}
+
+function renderMissingSubmissions(items){
+  const target = document.getElementById("missingSummary");
+
+  if(!items.length){
+    target.innerHTML = `<div class="status-good">No missing submissions found.</div>`;
+    return;
+  }
+
+  let html = `
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Team</th>
+            <th>Date</th>
+            <th>Opponent</th>
+            <th>Result</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+
+  items.forEach(item => {
+    html += `
+      <tr>
+        <td>${escapeHtml(item.team || "")}</td>
+        <td>${escapeHtml(formatDate(item.date || ""))}</td>
+        <td>${escapeHtml(item.opponent || "")}</td>
+        <td>${escapeHtml(item.result || "")}</td>
+      </tr>
+    `;
+  });
+
+  html += `
+        </tbody>
+      </table>
+    </div>
+    <div class="footer-note">These are completed GameChanger games with fewer NTB submissions than expected for that team/date.</div>
+  `;
+
+  target.innerHTML = html;
+}
+
+function buildRecordText(team){
+  const wins = Number(team.wins || 0);
+  const losses = Number(team.losses || 0);
+  const ties = Number(team.ties || 0);
+
+  if(ties > 0){
+    return `${wins}-${losses}-${ties}`;
+  }
+
+  return `${wins}-${losses}`;
+}
+
+function formatDate(value){
+  if(!value) return "";
+  const d = new Date(value + "T00:00:00");
+  if(isNaN(d.getTime())) return value;
+
+  return d.toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "numeric",
+    day: "numeric",
+    year: "numeric"
+  });
+}
+
+function cleanupJsonp(callbackName){
+  const script = document.getElementById(callbackName);
+  if(script) script.remove();
+  delete window[callbackName];
+}
+
+function escapeHtml(str){
+  return String(str)
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#39;");
+}
+
+loadAdminPage();
+</script>
+
+</body>
+</html>
