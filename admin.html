@@ -100,10 +100,6 @@ body{
   gap:12px;
 }
 
-.cards.three{
-  grid-template-columns:repeat(3, minmax(0,1fr));
-}
-
 .card{
   background:#eef4fb;
   border:1px solid #d3dfef;
@@ -185,9 +181,43 @@ th{
   color:#444;
 }
 
+.filters{
+  display:flex;
+  gap:18px;
+  align-items:center;
+  flex-wrap:wrap;
+  margin-bottom:14px;
+}
+
+.checkbox-wrap{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-size:14px;
+}
+
+.action-btn{
+  background:#b42318;
+  color:#fff;
+  border:none;
+  border-radius:4px;
+  padding:8px 10px;
+  cursor:pointer;
+  font-size:13px;
+  font-weight:bold;
+}
+
+.action-btn:hover{
+  background:#8f1c13;
+}
+
+.action-btn:disabled{
+  opacity:.6;
+  cursor:not-allowed;
+}
+
 @media (max-width:900px){
   .cards,
-  .cards.three,
   .grid-2{
     grid-template-columns:1fr;
   }
@@ -241,25 +271,30 @@ th{
 <div class="section">
   <h2>Performance Summary</h2>
 
+  <div class="filters">
+    <label class="checkbox-wrap">
+      <input type="checkbox" id="includeFallToggle" onchange="loadPerformanceSummary()">
+      Include Fall Games
+    </label>
+  </div>
+
   <div style="margin-bottom:16px;">
     <h3>Overall Organization</h3>
-    <div id="overallOrgCards" class="cards four loading">Loading...</div>
+    <div id="overallOrgCards" class="cards loading">Loading...</div>
   </div>
 
   <div class="grid-2">
     <div>
       <h3>Current Week (Monday-Sunday)</h3>
-      <div id="currentWeekOrgCards" class="cards four loading">Loading...</div>
+      <div id="currentWeekOrgCards" class="cards loading">Loading...</div>
     </div>
     <div>
       <h3>Previous Week (Monday-Sunday)</h3>
-      <div id="previousWeekOrgCards" class="cards four loading">Loading...</div>
+      <div id="previousWeekOrgCards" class="cards loading">Loading...</div>
     </div>
   </div>
 
-  <div class="footer-note">
-    Overall stats are based on all completed GameChanger games. Weekly stats use Monday-Sunday windows.
-  </div>
+  <div id="performanceNote" class="footer-note"></div>
 </div>
 
 <div class="section">
@@ -269,7 +304,7 @@ th{
 
 <div class="section">
   <h2>Submission Summary</h2>
-  <div id="submissionCards" class="cards four loading">Loading...</div>
+  <div id="submissionCards" class="cards loading">Loading...</div>
   <div id="submissionNote" class="footer-note"></div>
 </div>
 
@@ -290,6 +325,7 @@ function loadAdminPage(){
 
 function loadPerformanceSummary(){
   const callbackName = "performanceSummaryCallback_" + Date.now();
+  const includeFall = document.getElementById("includeFallToggle").checked ? "1" : "0";
 
   window[callbackName] = function(data){
     try{
@@ -306,7 +342,7 @@ function loadPerformanceSummary(){
 
   const script = document.createElement("script");
   script.id = callbackName;
-  script.src = API + "?performanceSummary=1&callback=" + callbackName;
+  script.src = API + "?performanceSummary=1&includeFall=" + encodeURIComponent(includeFall) + "&callback=" + callbackName;
   script.onerror = function(){
     renderPerformanceError("Error loading performance summary.");
     cleanupJsonp(callbackName);
@@ -394,15 +430,69 @@ function runGcSync(){
   document.body.appendChild(script);
 }
 
+function ignoreMissingGame(team, date){
+  const reason = window.prompt(`Reason for ignoring missing submission for ${team} on ${date}:`, "");
+  if(reason == null) return;
+
+  const trimmed = reason.trim();
+  if(!trimmed){
+    alert("Reason is required.");
+    return;
+  }
+
+  const callbackName = "ignoreMissingCallback_" + Date.now();
+  document.getElementById("syncStatus").textContent = `Ignoring missing submission for ${team} on ${date}...`;
+
+  window[callbackName] = function(data){
+    try{
+      if(data && data.success){
+        document.getElementById("syncStatus").textContent =
+          `Ignored missing submission for ${team} on ${date}.`;
+        loadSubmissionSummary();
+        loadMissingSubmissions();
+      } else {
+        document.getElementById("syncStatus").textContent =
+          `Ignore failed: ${escapeHtml((data && data.message) || "Unknown error")}`;
+      }
+    } finally {
+      cleanupJsonp(callbackName);
+    }
+  };
+
+  const script = document.createElement("script");
+  script.id = callbackName;
+  script.src =
+    API +
+    "?addMissingOverride=1" +
+    "&team=" + encodeURIComponent(team) +
+    "&date=" + encodeURIComponent(date) +
+    "&reason=" + encodeURIComponent(trimmed) +
+    "&callback=" + callbackName;
+
+  script.onerror = function(){
+    document.getElementById("syncStatus").textContent = "Ignore failed.";
+    cleanupJsonp(callbackName);
+  };
+
+  document.body.appendChild(script);
+}
+
 function renderPerformanceSummary(data){
   const overallOrg = data.overallOrg || {};
   const currentWeekOrg = data.currentWeekOrg || {};
   const previousWeekOrg = data.previousWeekOrg || {};
   const teams = Array.isArray(data.teams) ? data.teams : [];
+  const includeFall = !!data.includeFall;
+  const seasonYear = data.seasonYear || "";
 
   document.getElementById("overallOrgCards").innerHTML = buildStatCardsHtml(overallOrg, false);
   document.getElementById("currentWeekOrgCards").innerHTML = buildStatCardsHtml(currentWeekOrg, true);
   document.getElementById("previousWeekOrgCards").innerHTML = buildStatCardsHtml(previousWeekOrg, true);
+
+  document.getElementById("performanceNote").textContent =
+    includeFall
+      ? `${seasonYear} completed GameChanger games, including Fall.`
+      : `${seasonYear} completed GameChanger games, Spring/Summer only. Toggle Include Fall to add Fall games.`;
 
   renderTeamPerformance(teams);
 }
@@ -412,6 +502,7 @@ function renderPerformanceError(message){
   document.getElementById("currentWeekOrgCards").innerHTML = `<div class="empty">${escapeHtml(message)}</div>`;
   document.getElementById("previousWeekOrgCards").innerHTML = `<div class="empty">${escapeHtml(message)}</div>`;
   document.getElementById("teamPerformance").innerHTML = `<div class="empty">${escapeHtml(message)}</div>`;
+  document.getElementById("performanceNote").textContent = "";
 }
 
 function buildStatCardsHtml(stats, includeWindow){
@@ -513,6 +604,7 @@ function renderSubmissionSummary(data){
   const ntbSubmissions = Number(data.ntbSubmissions || 0);
   const missingSubmissions = Number(data.missingSubmissions || 0);
   const extraSubmissions = Number(data.extraSubmissions || 0);
+  const ignoredMissingRows = Number(data.ignoredMissingRows || 0);
 
   document.getElementById("submissionCards").innerHTML = `
     <div class="card">
@@ -534,7 +626,7 @@ function renderSubmissionSummary(data){
   `;
 
   document.getElementById("submissionNote").textContent =
-    `Submission tracking is based on GC_Submission_Check from ${data.compareStartDate || ""} and newer.`;
+    `Submission tracking is based on GC_Submission_Check from ${data.compareStartDate || ""} and newer. Ignored missing rows: ${ignoredMissingRows}.`;
 }
 
 function renderSubmissionError(message){
@@ -559,6 +651,7 @@ function renderMissingSubmissions(items){
             <th>Date</th>
             <th>Opponent</th>
             <th>Result</th>
+            <th>Action</th>
           </tr>
         </thead>
         <tbody>
@@ -571,6 +664,11 @@ function renderMissingSubmissions(items){
         <td>${escapeHtml(formatDate(item.date || ""))}</td>
         <td>${escapeHtml(item.opponent || "")}</td>
         <td>${escapeHtml(item.result || "")}</td>
+        <td>
+          <button class="action-btn" onclick="ignoreMissingGame(${JSON.stringify(item.team || "")}, ${JSON.stringify(item.date || "")})">
+            Ignore
+          </button>
+        </td>
       </tr>
     `;
   });
@@ -579,7 +677,7 @@ function renderMissingSubmissions(items){
         </tbody>
       </table>
     </div>
-    <div class="footer-note">These are completed GameChanger games with fewer NTB submissions than expected for that team/date.</div>
+    <div class="footer-note">These are completed GameChanger games with fewer NTB submissions than expected for that team/date. Ignoring a row removes it from this dashboard view but does not delete source data.</div>
   `;
 
   target.innerHTML = html;
