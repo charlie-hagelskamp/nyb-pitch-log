@@ -700,10 +700,18 @@ function renderCurrentWeekSchedule(data){
   const note = document.getElementById("currentWeekScheduleNote");
   const teams = Array.isArray(data.teams) ? data.teams : [];
 
-  note.textContent =
-    data.startDate && data.endDate
-      ? `${formatDate(data.startDate)} through ${formatDate(data.endDate)}`
-      : "";
+  let noteText = "";
+  if(data.startDate && data.endDate){
+    noteText += `${formatDate(data.startDate)} through ${formatDate(data.endDate)}`;
+  }
+  if(data.totalRowsRead != null){
+    noteText += `${noteText ? " • " : ""}Rows read: ${data.totalRowsRead}`;
+  }
+  if(data.totalRowsMatched != null){
+    noteText += `${noteText ? " • " : ""}Rows matched this week: ${data.totalRowsMatched}`;
+  }
+
+  note.textContent = noteText;
 
   if(!teams.length){
     target.innerHTML = `<div class="empty">No current week schedule found.</div>`;
