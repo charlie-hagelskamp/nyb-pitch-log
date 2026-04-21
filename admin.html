@@ -216,6 +216,63 @@ th{
   cursor:not-allowed;
 }
 
+.schedule-team{
+  border:1px solid #d5dbe7;
+  border-radius:8px;
+  margin-bottom:12px;
+  overflow:hidden;
+}
+
+.schedule-team-header{
+  width:100%;
+  border:none;
+  background:#eef4fb;
+  padding:14px;
+  text-align:left;
+  cursor:pointer;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  font-size:14px;
+}
+
+.schedule-team-header:hover{
+  background:#e3edf9;
+}
+
+.schedule-team-title{
+  font-weight:bold;
+  font-size:15px;
+}
+
+.schedule-team-meta{
+  color:#555;
+  font-size:13px;
+}
+
+.schedule-team-body{
+  display:none;
+  padding:12px;
+  background:#fff;
+}
+
+.schedule-team.open .schedule-team-body{
+  display:block;
+}
+
+.schedule-team.open .schedule-team-header{
+  border-bottom:1px solid #d5dbe7;
+}
+
+.chevron{
+  font-size:18px;
+  line-height:1;
+  color:#444;
+  min-width:18px;
+  text-align:center;
+}
+
 @media (max-width:900px){
   .cards,
   .grid-2{
@@ -246,6 +303,11 @@ th{
   .sync-btn{
     flex:1 1 auto;
     text-align:center;
+  }
+
+  .schedule-team-header{
+    flex-direction:column;
+    align-items:flex-start;
   }
 }
 </style>
@@ -303,6 +365,12 @@ th{
 </div>
 
 <div class="section">
+  <h2>Current Week Schedule</h2>
+  <div id="currentWeekSchedule" class="loading">Loading...</div>
+  <div id="currentWeekScheduleNote" class="footer-note"></div>
+</div>
+
+<div class="section">
   <h2>Submission Summary</h2>
   <div id="submissionCards" class="cards loading">Loading...</div>
   <div id="submissionNote" class="footer-note"></div>
@@ -319,6 +387,7 @@ const API = "https://script.google.com/macros/s/AKfycbwYw3hAF-O6qeiDkR9pb10OuwgX
 function loadAdminPage(){
   document.getElementById("syncStatus").textContent = "";
   loadPerformanceSummary();
+  loadCurrentWeekSchedule();
   loadSubmissionSummary();
   loadMissingSubmissions();
 }
@@ -345,6 +414,33 @@ function loadPerformanceSummary(){
   script.src = API + "?performanceSummary=1&includeFall=" + encodeURIComponent(includeFall) + "&callback=" + callbackName;
   script.onerror = function(){
     renderPerformanceError("Error loading performance summary.");
+    cleanupJsonp(callbackName);
+  };
+
+  document.body.appendChild(script);
+}
+
+function loadCurrentWeekSchedule(){
+  const callbackName = "currentWeekScheduleCallback_" + Date.now();
+
+  window[callbackName] = function(data){
+    try{
+      if(data && data.error){
+        renderCurrentWeekScheduleError(data.message || "Error loading current week schedule.");
+        return;
+      }
+
+      renderCurrentWeekSchedule(data || {});
+    } finally {
+      cleanupJsonp(callbackName);
+    }
+  };
+
+  const script = document.createElement("script");
+  script.id = callbackName;
+  script.src = API + "?currentWeekSchedule=1&callback=" + callbackName;
+  script.onerror = function(){
+    renderCurrentWeekScheduleError("Error loading current week schedule.");
     cleanupJsonp(callbackName);
   };
 
@@ -597,6 +693,110 @@ function renderTeamPerformance(teams){
   `;
 
   target.innerHTML = html;
+}
+
+function renderCurrentWeekSchedule(data){
+  const target = document.getElementById("currentWeekSchedule");
+  const note = document.getElementById("currentWeekScheduleNote");
+  const teams = Array.isArray(data.teams) ? data.teams : [];
+
+  note.textContent =
+    data.startDate && data.endDate
+      ? `${formatDate(data.startDate)} through ${formatDate(data.endDate)}`
+      : "";
+
+  if(!teams.length){
+    target.innerHTML = `<div class="empty">No current week schedule found.</div>`;
+    return;
+  }
+
+  let html = "";
+
+  teams.forEach((team, idx) => {
+    const summary = team.summary || {};
+    const games = Array.isArray(team.games) ? team.games : [];
+    const record = buildRecordText(summary);
+    const gameCount = games.length;
+
+    html += `
+      <div class="schedule-team ${idx === 0 ? "open" : ""}">
+        <button class="schedule-team-header" onclick="toggleScheduleTeam(this)">
+          <div>
+            <div class="schedule-team-title">${escapeHtml(team.team || "")}</div>
+            <div class="schedule-team-meta">
+              ${escapeHtml(String(gameCount))} game${gameCount === 1 ? "" : "s"} this week
+              • Completed record: ${escapeHtml(record)}
+              • RS ${escapeHtml(String(summary.runsScored || 0))}
+              • RA ${escapeHtml(String(summary.runsAllowed || 0))}
+            </div>
+          </div>
+          <div class="chevron">${idx === 0 ? "▾" : "▸"}</div>
+        </button>
+        <div class="schedule-team-body">
+          ${buildScheduleGamesTableHtml(games)}
+        </div>
+      </div>
+    `;
+  });
+
+  target.innerHTML = html;
+}
+
+function buildScheduleGamesTableHtml(games){
+  if(!games.length){
+    return `<div class="empty">No games found.</div>`;
+  }
+
+  let html = `
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Time</th>
+            <th>Opponent</th>
+            <th>Status</th>
+            <th>Result</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+
+  games.forEach(game => {
+    html += `
+      <tr>
+        <td>${escapeHtml(formatDate(game.date || ""))}</td>
+        <td>${escapeHtml(game.startTime || "")}</td>
+        <td>${escapeHtml(game.opponent || "")}</td>
+        <td>${escapeHtml(game.gameStatus || "")}</td>
+        <td>${escapeHtml(game.result || "")}</td>
+      </tr>
+    `;
+  });
+
+  html += `
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  return html;
+}
+
+function renderCurrentWeekScheduleError(message){
+  document.getElementById("currentWeekSchedule").innerHTML = `<div class="empty">${escapeHtml(message)}</div>`;
+  document.getElementById("currentWeekScheduleNote").textContent = "";
+}
+
+function toggleScheduleTeam(button){
+  const container = button.closest(".schedule-team");
+  if(!container) return;
+
+  const isOpen = container.classList.toggle("open");
+  const chevron = button.querySelector(".chevron");
+  if(chevron){
+    chevron.textContent = isOpen ? "▾" : "▸";
+  }
 }
 
 function renderSubmissionSummary(data){
