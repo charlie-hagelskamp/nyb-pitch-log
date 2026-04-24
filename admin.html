@@ -527,7 +527,16 @@ function runGcSync(){
 }
 
 function ignoreMissingGame(team, date){
-  const reason = window.prompt(`Reason for ignoring missing submission for ${team} on ${date}:`, "");
+  const rawTeam = String(team || "").trim();
+  const rawDate = normalizeRawDateForApi(date);
+
+  if(!rawTeam || !rawDate){
+    document.getElementById("syncStatus").textContent =
+      "Ignore failed: missing team or date.";
+    return;
+  }
+
+  const reason = window.prompt(`Reason for ignoring missing submission for ${rawTeam} on ${rawDate}:`, "");
   if(reason == null) return;
 
   const trimmed = reason.trim();
@@ -537,13 +546,13 @@ function ignoreMissingGame(team, date){
   }
 
   const callbackName = "ignoreMissingCallback_" + Date.now();
-  document.getElementById("syncStatus").textContent = `Ignoring missing submission for ${team} on ${date}...`;
+  document.getElementById("syncStatus").textContent = `Ignoring missing submission for ${rawTeam} on ${rawDate}...`;
 
   window[callbackName] = function(data){
     try{
       if(data && data.success){
         document.getElementById("syncStatus").textContent =
-          `Ignored missing submission for ${team} on ${date}.`;
+          `Ignored missing submission for ${rawTeam} on ${rawDate}.`;
         loadSubmissionSummary();
         loadMissingSubmissions();
       } else {
@@ -557,16 +566,22 @@ function ignoreMissingGame(team, date){
 
   const script = document.createElement("script");
   script.id = callbackName;
-  script.src =
+
+  const url =
     API +
     "?addMissingOverride=1" +
-    "&team=" + encodeURIComponent(team) +
-    "&date=" + encodeURIComponent(date) +
+    "&team=" + encodeURIComponent(rawTeam) +
+    "&date=" + encodeURIComponent(rawDate) +
     "&reason=" + encodeURIComponent(trimmed) +
     "&callback=" + callbackName;
 
+  script.src = url;
+
+  console.log("Ignore URL:", url);
+
   script.onerror = function(){
-    document.getElementById("syncStatus").textContent = "Ignore failed.";
+    document.getElementById("syncStatus").textContent =
+      "Ignore failed. URL called: " + url;
     cleanupJsonp(callbackName);
   };
 
@@ -866,14 +881,17 @@ function renderMissingSubmissions(items){
   `;
 
   items.forEach(item => {
+    const rawTeam = item.team || "";
+    const rawDate = normalizeRawDateForApi(item.date || "");
+
     html += `
       <tr>
-        <td>${escapeHtml(item.team || "")}</td>
-        <td>${escapeHtml(formatDate(item.date || ""))}</td>
+        <td>${escapeHtml(rawTeam)}</td>
+        <td>${escapeHtml(formatDate(rawDate))}</td>
         <td>${escapeHtml(item.opponent || "")}</td>
         <td>${escapeHtml(item.result || "")}</td>
         <td>
-          <button class="action-btn" onclick="ignoreMissingGame(${JSON.stringify(item.team || "")}, ${JSON.stringify(item.date || "")})">
+          <button class="action-btn" onclick="ignoreMissingGame(${JSON.stringify(rawTeam)}, ${JSON.stringify(rawDate)})">
             Ignore
           </button>
         </td>
@@ -905,7 +923,11 @@ function buildRecordText(stats){
 
 function formatDate(value){
   if(!value) return "";
-  const d = new Date(value + "T00:00:00");
+
+  const normalized = normalizeRawDateForApi(value);
+  if(!normalized) return String(value);
+
+  const d = new Date(normalized + "T00:00:00");
   if(isNaN(d.getTime())) return value;
 
   return d.toLocaleDateString(undefined, {
@@ -916,15 +938,52 @@ function formatDate(value){
   });
 }
 
-  function formatGameTime(value){
+function normalizeRawDateForApi(value){
   if(!value) return "";
 
-  // Already a friendly time string like "6:00 PM"
+  if(value instanceof Date && !isNaN(value.getTime())){
+    const y = value.getFullYear();
+    const m = String(value.getMonth() + 1).padStart(2, "0");
+    const d = String(value.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+
+  const str = String(value).trim();
+
+  if(/^\d{4}-\d{2}-\d{2}$/.test(str)){
+    return str;
+  }
+
+  const parsed = new Date(str);
+  if(!isNaN(parsed.getTime())){
+    const y = parsed.getFullYear();
+    const m = String(parsed.getMonth() + 1).padStart(2, "0");
+    const d = String(parsed.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+
+  return str;
+}
+
+function formatGameTime(value){
+  if(!value) return "";
+
   if(typeof value === "string" && /am|pm/i.test(value)){
     return value;
   }
 
-  // Handle ISO-looking values like 1899-12-31T02:00:00.000Z
+  const str = String(value).trim();
+
+  const isoMatch = str.match(/T(\d{2}):(\d{2}):/);
+  if(isoMatch){
+    let hour = Number(isoMatch[1]);
+    const minute = isoMatch[2];
+    const suffix = hour >= 12 ? "PM" : "AM";
+    hour = hour % 12;
+    if(hour === 0) hour = 12;
+    return `${hour}:${minute} ${suffix}`;
+  }
+
   const d = new Date(value);
   if(!isNaN(d.getTime())){
     return d.toLocaleTimeString(undefined, {
@@ -933,10 +992,9 @@ function formatDate(value){
     });
   }
 
-  // Fallback for plain spreadsheet-style time strings
-  return String(value);
+  return str;
 }
-  
+
 function cleanupJsonp(callbackName){
   const script = document.getElementById(callbackName);
   if(script) script.remove();
