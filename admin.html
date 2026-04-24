@@ -545,37 +545,55 @@ function ignoreMissingGame(team, date){
     return;
   }
 
+  const callbackName = "ignoreMissingCallback";
+
+  window[callbackName] = function(data){
+    console.log("Ignore response:", data);
+
+    if(data && data.success){
+      document.getElementById("syncStatus").textContent =
+        `Ignored missing submission for ${rawTeam} on ${rawDate}.`;
+
+      loadSubmissionSummary();
+      loadMissingSubmissions();
+    } else {
+      document.getElementById("syncStatus").textContent =
+        `Ignore failed: ${escapeHtml((data && data.message) || "Unknown error")}`;
+    }
+
+    const oldScript = document.getElementById("ignoreMissingScript");
+    if(oldScript) oldScript.remove();
+  };
+
+  const oldScript = document.getElementById("ignoreMissingScript");
+  if(oldScript) oldScript.remove();
+
+  const script = document.createElement("script");
+  script.id = "ignoreMissingScript";
+
   const url =
     API +
     "?addMissingOverride=1" +
     "&team=" + encodeURIComponent(rawTeam) +
     "&date=" + encodeURIComponent(rawDate) +
     "&reason=" + encodeURIComponent(trimmed) +
-    "&callback=ignoreCallback";
+    "&callback=" + callbackName;
 
-  console.log("Ignore iframe URL:", url);
+  console.log("Ignore script URL:", url);
 
   document.getElementById("syncStatus").textContent =
     `Ignoring missing submission for ${rawTeam} on ${rawDate}...`;
 
-  const iframe = document.createElement("iframe");
-  iframe.style.display = "none";
-  iframe.src = url;
+  script.src = url;
 
-  document.body.appendChild(iframe);
-
-  setTimeout(function(){
+  script.onerror = function(){
     document.getElementById("syncStatus").textContent =
-      `Ignore request sent for ${rawTeam} on ${rawDate}. Refreshing...`;
+      "Ignore failed. Check console/network for the Apps Script request.";
+  };
 
-    loadSubmissionSummary();
-    loadMissingSubmissions();
-
-    setTimeout(function(){
-      iframe.remove();
-    }, 2000);
-  }, 1500);
+  document.body.appendChild(script);
 }
+  
 function renderPerformanceSummary(data){
   const overallOrg = data.overallOrg || {};
   const currentWeekOrg = data.currentWeekOrg || {};
