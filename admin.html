@@ -886,7 +886,7 @@ function renderMissingSubmissions(items){
         <tbody>
   `;
 
-  items.forEach(item => {
+  items.forEach((item, index) => {
     const rawTeam = item.team || "";
     const rawDate = normalizeRawDateForApi(item.date || "");
 
@@ -897,7 +897,11 @@ function renderMissingSubmissions(items){
         <td>${escapeHtml(item.opponent || "")}</td>
         <td>${escapeHtml(item.result || "")}</td>
         <td>
-          <button class="action-btn" onclick="ignoreMissingGame(${JSON.stringify(rawTeam)}, ${JSON.stringify(rawDate)})">
+          <button
+            class="action-btn ignore-btn"
+            data-team="${escapeHtml(rawTeam)}"
+            data-date="${escapeHtml(rawDate)}"
+          >
             Ignore
           </button>
         </td>
@@ -913,8 +917,13 @@ function renderMissingSubmissions(items){
   `;
 
   target.innerHTML = html;
-}
 
+  document.querySelectorAll(".ignore-btn").forEach(btn => {
+    btn.addEventListener("click", function(){
+      ignoreMissingGame(this.dataset.team, this.dataset.date);
+    });
+  });
+}
 function buildRecordText(stats){
   const wins = Number(stats.wins || 0);
   const losses = Number(stats.losses || 0);
