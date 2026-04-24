@@ -545,49 +545,37 @@ function ignoreMissingGame(team, date){
     return;
   }
 
-  const callbackName = "ignoreMissingCallback_" + Date.now();
-  document.getElementById("syncStatus").textContent = `Ignoring missing submission for ${rawTeam} on ${rawDate}...`;
-
-  window[callbackName] = function(data){
-    try{
-      if(data && data.success){
-        document.getElementById("syncStatus").textContent =
-          `Ignored missing submission for ${rawTeam} on ${rawDate}.`;
-        loadSubmissionSummary();
-        loadMissingSubmissions();
-      } else {
-        document.getElementById("syncStatus").textContent =
-          `Ignore failed: ${escapeHtml((data && data.message) || "Unknown error")}`;
-      }
-    } finally {
-      cleanupJsonp(callbackName);
-    }
-  };
-
-  const script = document.createElement("script");
-  script.id = callbackName;
-
   const url =
     API +
     "?addMissingOverride=1" +
     "&team=" + encodeURIComponent(rawTeam) +
     "&date=" + encodeURIComponent(rawDate) +
     "&reason=" + encodeURIComponent(trimmed) +
-    "&callback=" + callbackName;
+    "&callback=ignoreCallback";
 
-  script.src = url;
+  console.log("Ignore iframe URL:", url);
 
-  console.log("Ignore URL:", url);
+  document.getElementById("syncStatus").textContent =
+    `Ignoring missing submission for ${rawTeam} on ${rawDate}...`;
 
-  script.onerror = function(){
+  const iframe = document.createElement("iframe");
+  iframe.style.display = "none";
+  iframe.src = url;
+
+  document.body.appendChild(iframe);
+
+  setTimeout(function(){
     document.getElementById("syncStatus").textContent =
-      "Ignore failed. URL called: " + url;
-    cleanupJsonp(callbackName);
-  };
+      `Ignore request sent for ${rawTeam} on ${rawDate}. Refreshing...`;
 
-  document.body.appendChild(script);
+    loadSubmissionSummary();
+    loadMissingSubmissions();
+
+    setTimeout(function(){
+      iframe.remove();
+    }, 2000);
+  }, 1500);
 }
-
 function renderPerformanceSummary(data){
   const overallOrg = data.overallOrg || {};
   const currentWeekOrg = data.currentWeekOrg || {};
