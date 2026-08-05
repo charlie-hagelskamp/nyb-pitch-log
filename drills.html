@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Noblesville Travel Baseball Drills</title>
+
+<style>
+body{
+  font-family:Arial, Helvetica, sans-serif;
+  margin:0;
+  background:#f4f1ea;
+  color:#171717;
+}
+
+.page-shell{
+  max-width:1180px;
+  margin:auto;
+  padding:18px;
+}
+
+.header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:18px;
+  gap:12px;
+  flex-wrap:wrap;
+  background:#050505;
+  border:1px solid #2c2618;
+  border-radius:8px;
+  padding:12px;
+  box-shadow:0 10px 28px rgba(0,0,0,.16);
+}
+
+.header-left{
+  display:flex;
+  align-items:center;
+  gap:15px;
+  flex:1 1 auto;
+  min-width:0;
+}
+
+.header img.logo{
+  width:72px;
+  height:72px;
+  object-fit:cover;
+  border-radius:50%;
+  border:2px solid #b8a05c;
+  background:#050505;
+}
+
+.header h1{
+  font-size:1.35em;
+  margin:0;
+  color:#fff;
+}
+
+.header-kicker{
+  color:#c8b46c;
+  font-size:12px;
+  font-weight:bold;
+  margin-bottom:4px;
+  text-transform:uppercase;
+}
+
+.header-actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+.header a.action-link{
+  text-decoration:none;
+  background:#1c1c1c;
+  color:#f7f3e8;
+  padding:10px 14px;
+  border-radius:4px;
+  font-size:14px;
+  font-weight:bold;
+  display:inline-block;
+  border:1px solid #3c3522;
+}
+
+.header a.action-link:hover{
+  background:#b8a05c;
+  color:#050505;
+}
+
+.header a.action-link.active{
+  background:#b8a05c;
+  color:#050505;
+}
+
+.page-title{
+  margin:0;
+  font-size:30px;
+}
+
+.intro{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:end;
+  gap:16px;
+  margin-bottom:18px;
+}
+
+.intro-copy{
+  color:#444;
+  line-height:1.5;
+  margin:8px 0 0 0;
+  max-width:720px;
+}
+
+.library-stat{
+  background:#fff;
+  border:1px solid #ddd1b2;
+  border-radius:8px;
+  padding:12px 16px;
+  min-width:130px;
+}
+
+.library-stat-value{
+  font-size:28px;
+  font-weight:bold;
+}
+
+.library-stat-label{
+  color:#555;
+  font-size:12px;
+  font-weight:bold;
+  text-transform:uppercase;
+}
+
+.section{
+  background:#fff;
+  border:1px solid #dfd5bd;
+  border-radius:8px;
+  padding:14px;
+  margin-bottom:18px;
+  box-shadow:0 8px 20px rgba(30,24,12,.06);
+}
+
+.filters{
+  display:grid;
+  grid-template-columns:2fr 1fr 1fr;
+  gap:12px;
+  align-items:end;
+}
+
+label{
+  font-size:13px;
+  font-weight:bold;
+  color:#272317;
+}
+
+input,
+select{
+  width:100%;
+  padding:10px;
+  margin-top:6px;
+  font-size:16px;
+  border:1px solid #c8b98e;
+  border-radius:4px;
+  box-sizing:border-box;
+  background:#fff;
+}
+
+input:focus,
+select:focus{
+  outline:2px solid rgba(184,160,92,.35);
+  border-color:#9d833e;
+}
+
+.summary-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  flex-wrap:wrap;
+  margin-bottom:12px;
+}
+
+.count{
+  color:#555;
+  font-size:14px;
+}
+
+.drill-grid{
+  display:grid;
+  grid-template-columns:repeat(3, minmax(0,1fr));
+  gap:10px;
+}
+
+.drill-card{
+  border:1px solid #dfd5bd;
+  border-radius:8px;
+  background:#fffdf8;
+  padding:12px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  min-height:132px;
+  box-shadow:0 8px 18px rgba(30,24,12,.07);
+}
+
+.drill-title{
+  font-size:16px;
+  font-weight:bold;
+  line-height:1.25;
+}
+
+.drill-meta{
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+}
+
+.pill{
+  background:#f1ead8;
+  border:1px solid #d8c68f;
+  color:#2d2718;
+  border-radius:999px;
+  padding:3px 7px;
+  font-size:12px;
+  font-weight:bold;
+}
+
+.focus{
+  font-size:13px;
+  line-height:1.35;
+  color:#282828;
+}
+
+.notes{
+  color:#555;
+  font-size:13px;
+  line-height:1.35;
+  white-space:pre-wrap;
+}
+
+.card-actions{
+  margin-top:auto;
+}
+
+.open-link{
+  display:inline-block;
+  text-decoration:none;
+  background:#080808;
+  color:#fff;
+  padding:8px 11px;
+  border-radius:4px;
+  font-size:13px;
+  font-weight:bold;
+}
+
+.open-link:hover{
+  background:#b8a05c;
+  color:#050505;
+}
+
+.open-link.disabled{
+  background:#d5dbe7;
+  color:#555;
+  cursor:not-allowed;
+}
+
+.empty{
+  color:#666;
+  font-style:italic;
+}
+
+.error{
+  color:#b42318;
+  font-weight:bold;
+}
+
+@media (max-width:900px){
+  .intro{
+    grid-template-columns:1fr;
+  }
+
+  .filters,
+  .drill-grid{
+    grid-template-columns:1fr 1fr;
+  }
+}
+
+@media (max-width:700px){
+  .header{
+    align-items:flex-start;
+  }
+
+  .header-left,
+  .header-actions{
+    width:100%;
+  }
+
+  .header a.action-link{
+    flex:1 1 auto;
+    text-align:center;
+  }
+
+  .filters,
+  .drill-grid{
+    grid-template-columns:1fr;
+  }
+
+  .page-shell{
+    padding:12px;
+  }
+
+  .header img.logo{
+    width:62px;
+    height:62px;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<div class="page-shell">
+  <div class="header">
+    <div class="header-left">
+      <img src="nyb-logo.png" class="logo" alt="Noblesville Travel Baseball">
+      <div>
+        <div class="header-kicker">Coach Hub</div>
+        <h1>Noblesville Travel Baseball</h1>
+      </div>
+    </div>
+    <div class="header-actions">
+      <a href="index.html" class="action-link">Pitch Log</a>
+      <a href="drills.html" class="action-link active">Drills</a>
+      <a href="admin.html" class="action-link">Admin</a>
+    </div>
+  </div>
+
+  <div class="intro">
+    <div>
+      <h2 class="page-title">Drills Library</h2>
+      <p class="intro-copy">A quick-access library for practice stations, warmups, and skill work. Filter by category or source, then open the video your coaches need.</p>
+    </div>
+    <div class="library-stat">
+      <div id="libraryStatValue" class="library-stat-value">0</div>
+      <div class="library-stat-label">Drills</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="filters">
+      <label>
+        Search
+        <input id="searchInput" type="search" placeholder="Search drills">
+      </label>
+
+      <label>
+        Category
+        <select id="categoryFilter">
+          <option value="All">All</option>
+        </select>
+      </label>
+
+      <label>
+        Source
+        <select id="sourceFilter">
+          <option value="All">All</option>
+        </select>
+      </label>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="summary-row">
+      <div id="drillCount" class="count">Loading...</div>
+    </div>
+    <div id="drillResults" class="drill-grid"></div>
+  </div>
+</div>
+
+<script>
+const DEFAULT_CATEGORIES = [
+  "Hitting",
+  "Infield",
+  "Outfield",
+  "Pitching",
+  "Catching",
+  "Baserunning"
+];
+
+let drills = [];
+
+async function loadDrills(){
+  try{
+    const res = await fetch("drills.json", { cache: "no-store" });
+    if(!res.ok) throw new Error("Unable to load drills.json");
+
+    const data = await res.json();
+    drills = Array.isArray(data) ? data : [];
+    document.getElementById("libraryStatValue").textContent = drills.length;
+
+    populateFilters();
+    renderDrills();
+  }catch(err){
+    document.getElementById("drillCount").textContent = "";
+    document.getElementById("drillResults").className = "";
+    document.getElementById("drillResults").innerHTML =
+      `<div class="error">${escapeHtml(err.message || String(err))}</div>`;
+  }
+}
+
+function populateFilters(){
+  const categories = uniqueValues(DEFAULT_CATEGORIES.concat(drills.map(d => d.category)));
+  const sources = uniqueValues(drills.map(d => d.source));
+
+  fillSelect("categoryFilter", categories);
+  fillSelect("sourceFilter", sources);
+}
+
+function fillSelect(id, values){
+  const select = document.getElementById(id);
+  const current = select.value || "All";
+
+  select.innerHTML = `<option value="All">All</option>`;
+
+  values
+    .filter(Boolean)
+    .forEach(value => {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = value;
+      select.appendChild(option);
+    });
+
+  if([...select.options].some(o => o.value === current)){
+    select.value = current;
+  }
+}
+
+function renderDrills(){
+  const search = document.getElementById("searchInput").value.trim().toLowerCase();
+  const category = document.getElementById("categoryFilter").value;
+  const source = document.getElementById("sourceFilter").value;
+
+  const filtered = drills.filter(drill => {
+    const searchable = [
+      drill.title,
+      drill.category,
+      drill.focus,
+      drill.source,
+      drill.notes
+    ].join(" ").toLowerCase();
+
+    const matchesSearch = !search || searchable.includes(search);
+    const matchesCategory = category === "All" || drill.category === category;
+    const matchesSource = source === "All" || drill.source === source;
+
+    return matchesSearch && matchesCategory && matchesSource;
+  });
+
+  document.getElementById("drillCount").textContent =
+    `${filtered.length} of ${drills.length} drills`;
+
+  const target = document.getElementById("drillResults");
+
+  if(filtered.length === 0){
+    target.className = "";
+    target.innerHTML = `<div class="empty">No drills match these filters.</div>`;
+    return;
+  }
+
+  target.className = "drill-grid";
+  target.innerHTML = filtered.map(buildDrillCard).join("");
+}
+
+function buildDrillCard(drill){
+  const title = drill.title || "Untitled Drill";
+  const category = drill.category || "Uncategorized";
+  const source = drill.source || "Link";
+  const focus = drill.focus || "";
+  const notes = drill.notes || "";
+  const url = String(drill.url || "").trim();
+  const linkHtml = url
+    ? `<a class="open-link" href="${escapeAttribute(url)}" target="_blank" rel="noopener">Open ${escapeHtml(source)}</a>`
+    : `<span class="open-link disabled">No Link Yet</span>`;
+
+  return `
+    <article class="drill-card">
+      <div class="drill-title">${escapeHtml(title)}</div>
+      <div class="drill-meta">
+        <span class="pill">${escapeHtml(category)}</span>
+        <span class="pill">${escapeHtml(source)}</span>
+      </div>
+      ${focus ? `<div class="focus"><strong>Focus:</strong> ${escapeHtml(focus)}</div>` : ""}
+      ${notes ? `<div class="notes">${escapeHtml(notes)}</div>` : ""}
+      <div class="card-actions">${linkHtml}</div>
+    </article>
+  `;
+}
+
+function uniqueValues(values){
+  return [...new Set(values.map(v => String(v || "").trim()).filter(Boolean))].sort();
+}
+
+function escapeHtml(str){
+  return String(str)
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#39;");
+}
+
+function escapeAttribute(str){
+  return escapeHtml(str).replaceAll("`","&#96;");
+}
+
+["searchInput", "categoryFilter", "sourceFilter"].forEach(id => {
+  document.getElementById(id).addEventListener("input", renderDrills);
+  document.getElementById(id).addEventListener("change", renderDrills);
+});
+
+loadDrills();
+</script>
+
+</body>
+</html>

@@ -1,99 +1,109 @@
 {
-"10U Black":[
-"Teddy Unterfranz",
-"Brayden Scott",
-"Matthew Agerter",
-"Parker Sprunger",
-"Cameron Buergelin",
-"Gavin Gasser",
-"Brayden Hawkins",
-"Esteban Naranjo",
-"Elijah Pease",
-"Maximiliano Rodriguez",
-"Declan Spehler",
-"Connor Thoma"
-],
-
-"10U Gold":[
-"Alex Nobbe",
-"Carson Rosenbaum",
-"Graham Eads",
-"Elliot Gilbert",
-"Riley Jankowski",
-"Dumoluhle Ndabeni",
-"Kai Pruitt",
-"Carter Rothrock",
-"Gabe Thompson",
-"Berkeley Warriner",
-"Jacob Young"
-],
-
-"11U Black":[
-"Davis Lester",
-"Miles Raber",
-"Zane Steele",
-"Brady Turner",
-"Brayden Brackett",
-"Brendan DeYoung",
-"Cayden DeYoung",
-"Jude Hutton",
-"Jude Martin",
-"Chase Metzger",
-"August Smith"
-],
-
-"11U Gold":[
-"Cohen Cooley",
-"Lucas Schrank",
-"Liam Bogard",
-"Drew Filler",
-"Zander Huffman",
-"Koen Johnson",
-"Grayson Logan",
-"Mitchell Mathes",
-"Brody Taylor",
-"Grayson Ziliak",
-"Ryan Zuniga"
-],
-
-"9U Black":[
-"Easton Hackney",
-"Miles Phipps",
-"JJ Stone",
-"Lucas Hochstedler",
-"Nolan Brooks",
-"Maxwell Brown",
-"Cameron Hubbard",
-"Kash Jackson",
-"Hank Jensen",
-"Brody Jensen",
-"Max Talpas"
-],
-
-"9U Gold":[
-"Jackson Forehand",
-"Harrison Marhoefer",
-"Griffyn O'Connell",
-"Knox Johnson",
-"Jameson Dickover",
-"Harrison Glowacki",
-"Tate Hall",
-"Evan Portmann",
-"Owen Watson",
-"Dawson Willman"
-],
-
-"7U Black":[
-"Porter Eck",
-"Major Phipps",
-"Tucker Sears",
-"Jackson Strainis",
-"Jackson Underwood",
-"Archie Canada",
-"Emmett Eads",
-"Ian Myers",
-"Harper Prince",
-"Austin Punt",
-"Griffin Rosenbaum"
-]
+  "12U Gold": [
+    { "name": "Brody Taylor", "number": 17 },
+    { "name": "Cohen Cooley", "number": 3 },
+    { "name": "Liam Bogard", "number": 22 },
+    { "name": "Koen Johnson", "number": 23 },
+    { "name": "Lucas Schrank", "number": 10 },
+    { "name": "Ryan Zuniga", "number": 2 },
+    { "name": "Grayson Logan", "number": 16 },
+    { "name": "Mitchell Mathes", "number": 12 },
+    { "name": "Zander Huffman", "number": 5 },
+    { "name": "Grayson Ziliak", "number": 54 }
+  ],
+  "11U Black": [
+    { "name": "Esteban Naranjo", "number": 28 },
+    { "name": "Matthew Agerter", "number": 25 },
+    { "name": "Brayden Hawkins", "number": 44 },
+    { "name": "Teddy Unterfranz", "number": 99 },
+    { "name": "Declan Spehler", "number": 9 },
+    { "name": "Gavin Gasser", "number": 3 },
+    { "name": "Alex Nobbe", "number": 2 },
+    { "name": "Elijah Pease", "number": 22 },
+    { "name": "Eli McClave", "number": 17 },
+    { "name": "Maximiliano Rodriguez", "number": 13 },
+    { "name": "Carson Rosenbaum", "number": 23 }
+  ],
+  "11U Gold": [
+    { "name": "Dumoluhle Ndabeni", "number": 86 },
+    { "name": "Jacob Young", "number": 14 },
+    { "name": "Carter Rothrock", "number": 5 },
+    { "name": "Elliot Gilbert", "number": 2 },
+    { "name": "Berkeley Warriner", "number": 29 },
+    { "name": "Stanford McMahon", "number": 10 },
+    { "name": "Charles Fivecoate", "number": 36 },
+    { "name": "Graham Eads", "number": 13 },
+    { "name": "Riley Jankowski", "number": 8 },
+    { "name": "Gabe Thompson", "number": 3 }
+  ],
+  "10U Black": [
+    { "name": "Parker Sprunger", "number": 8 },
+    { "name": "Easton Hackney", "number": 13 },
+    { "name": "JJ Stone", "number": 22 },
+    { "name": "Guy Whisler", "number": 9 },
+    { "name": "Nolan Brooks", "number": 99 },
+    { "name": "Max Talpas", "number": 10 },
+    { "name": "Brody Jensen", "number": 11 },
+    { "name": "Hank Jensen", "number": 7 },
+    { "name": "Lucas Hochstedler", "number": 44 },
+    { "name": "Leo Hartley", "number": 3 },
+    { "name": "Max Brown", "number": 1 }
+  ],
+  "10U Gold": [
+    { "name": "Jeremiah Lane", "number": 24 },
+    { "name": "Harrison Sanders", "number": 3 },
+    { "name": "Harrison Marhoefer", "number": 9 },
+    { "name": "Jackson Forehand", "number": 7 },
+    { "name": "Dawson Willman", "number": 77 },
+    { "name": "Harrison Glowacki", "number": 4 },
+    { "name": "Knox Johnson", "number": 17 },
+    { "name": "Griffyn O'Connell", "number": 12 },
+    { "name": "Owen Watson", "number": 10 },
+    { "name": "Jameson Dickover", "number": 99 },
+    { "name": "Greyson Jones", "number": 97 },
+    { "name": "Sammy Nicholson", "number": 29 }
+  ],
+  "8U Black": [
+    { "name": "Jackson Underwood", "number": 99 },
+    { "name": "Major Phipps", "number": 22 },
+    { "name": "Tucker Osborn", "number": 27 },
+    { "name": "William Spencer", "number": 67 },
+    { "name": "Ian Myers", "number": 3 },
+    { "name": "Tucker Sears", "number": 7 },
+    { "name": "Joey Slopsema", "number": 17 },
+    { "name": "Austin Punt", "number": 21 },
+    { "name": "Kaden McLean", "number": 39 },
+    { "name": "Emmett Eads", "number": 13 },
+    { "name": "Casen Kluesner", "number": 44 },
+    { "name": "Micah Pease", "number": 28 }
+  ],
+  "8U Gold": [
+    { "name": "Harper Prince", "number": 10 },
+    { "name": "Beau Nichols", "number": 3 },
+    { "name": "Beau O'Donohue", "number": 15 },
+    { "name": "Logan Hawkins", "number": 44 },
+    { "name": "Logan Darrow", "number": 7 },
+    { "name": "James Patton", "number": 0 },
+    { "name": "Cohen Tomanski", "number": 8 },
+    { "name": "Everest Yost", "number": 99 },
+    { "name": "Declan Dickover", "number": 98 },
+    { "name": "Owen Daniele", "number": 5 },
+    { "name": "Shane Horwath", "number": 17 },
+    { "name": "Andrew McClave", "number": 41 }
+  ],
+  "7U Black": [
+    { "name": "Kessler McClung", "number": 24 },
+    { "name": "Sam Stone", "number": 22 },
+    { "name": "Jackson Shaw", "number": 13 },
+    { "name": "Cooper Sprunger", "number": 8 },
+    { "name": "Axel Hartley", "number": 6 },
+    { "name": "Alexander Holcombe", "number": 2 },
+    { "name": "Jackson Prince", "number": 23 },
+    { "name": "Corbin Koepfer", "number": 10 },
+    { "name": "Luke Agerter", "number": 25 },
+    { "name": "Brooks Bigler", "number": 67 },
+    { "name": "Brooks Nagel", "number": 1 },
+    { "name": "Ranger Shuff", "number": 7 },
+    { "name": "Brooks White", "number": 14 }
+  ]
 }

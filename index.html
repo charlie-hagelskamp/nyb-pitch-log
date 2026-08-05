@@ -101,6 +101,25 @@ button:disabled{
   margin-left:8px;
 }
 
+.player-number{
+  background:#b8a05c;
+  color:#050505;
+  border-radius:999px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:34px;
+  padding:4px 8px;
+  margin-right:10px;
+  font-size:13px;
+  font-weight:bold;
+}
+
+.player-name{
+  flex:1;
+  text-align:left;
+}
+
 .log-remove-btn{
   font-size:12px;
   margin-left:8px;
@@ -308,25 +327,189 @@ button:disabled{
     padding:6px;
   }
 }
+
+body{
+  font-family:Arial, Helvetica, sans-serif;
+  max-width:none;
+  margin:0;
+  padding:0;
+  background:#f4f1ea;
+  color:#171717;
+}
+
+.page-shell{
+  max-width:1180px;
+  margin:auto;
+  padding:18px;
+}
+
+.header{
+  margin-bottom:18px;
+  background:#050505;
+  border:1px solid #2c2618;
+  border-radius:8px;
+  padding:12px;
+  box-shadow:0 10px 28px rgba(0,0,0,.16);
+}
+
+.header img.logo{
+  width:72px;
+  height:72px;
+  object-fit:cover;
+  border-radius:50%;
+  border:2px solid #b8a05c;
+  background:#050505;
+}
+
+.header h1{
+  font-size:1.35em;
+  color:#fff;
+}
+
+.header-kicker{
+  color:#c8b46c;
+  font-size:12px;
+  font-weight:bold;
+  margin-bottom:4px;
+  text-transform:uppercase;
+}
+
+.header a.action-link{
+  background:#1c1c1c;
+  color:#f7f3e8;
+  padding:10px 14px;
+  border:1px solid #3c3522;
+}
+
+.header a.action-link:hover,
+.header a.action-link.active{
+  background:#b8a05c;
+  color:#050505;
+}
+
+.page-title{
+  margin:0;
+  font-size:30px;
+}
+
+.intro{
+  margin-bottom:18px;
+}
+
+.intro-copy{
+  color:#444;
+  line-height:1.5;
+  margin:8px 0 0 0;
+  max-width:720px;
+}
+
+.section,
+#summary,
+#dashboard,
+#gameNotesLogs,
+.pitchsmart-box{
+  background:#fff;
+  border:1px solid #dfd5bd;
+  border-radius:8px;
+  padding:16px;
+  box-shadow:0 8px 20px rgba(30,24,12,.06);
+}
+
+#form-section{
+  margin-bottom:18px;
+}
+
+input,
+select,
+textarea{
+  border:1px solid #c8b98e;
+  border-radius:4px;
+  background:#fff;
+}
+
+input:focus,
+select:focus,
+textarea:focus{
+  outline:2px solid rgba(184,160,92,.35);
+  border-color:#9d833e;
+}
+
+button{
+  background:#080808;
+  color:#fff;
+  border:1px solid #080808;
+  border-radius:4px;
+  font-weight:bold;
+}
+
+button:hover{
+  background:#b8a05c;
+  border-color:#b8a05c;
+  color:#050505;
+}
+
+.player{
+  background:#fffdf8;
+  border:1px solid #dfd5bd;
+  color:#171717;
+}
+
+.player.added{
+  background:#f1ead8;
+  border-color:#b8a05c;
+  color:#171717;
+}
+
+.log-remove-btn{
+  background:#b42318;
+  color:#fff;
+  border:none;
+}
+
+.pitchsmart-table th,
+.dashboard-table th{
+  background:#f1ead8;
+}
+
+@media (max-width:700px){
+  .page-shell{
+    padding:12px;
+  }
+
+  .header img.logo{
+    width:62px;
+    height:62px;
+  }
+}
 </style>
 </head>
 
 <body>
 
-<div class="header">
-  <div class="header-left">
-    <img src="DC5hbQVQ.jpg" class="logo">
-    <h1>Noblesville Travel Baseball</h1>
+<div class="page-shell">
+  <div class="header">
+    <div class="header-left">
+      <img src="nyb-logo.png" class="logo" alt="Noblesville Travel Baseball">
+      <div>
+        <div class="header-kicker">Coach Hub</div>
+        <h1>Noblesville Travel Baseball</h1>
+      </div>
+    </div>
+    <div class="header-actions">
+      <a href="index.html" class="action-link active">Pitch Log</a>
+      <a href="drills.html" class="action-link">Drills</a>
+      <a href="#" class="action-link" onclick="showDashboard(); return false;">Dashboard</a>
+      <a href="#" class="action-link" onclick="showGameNotesLogs(); return false;">Game Notes</a>
+      <a href="admin.html" class="action-link">Admin</a>
+    </div>
   </div>
-  <div class="header-actions">
-    <a href="#" class="action-link" onclick="showDashboard(); return false;">Dashboard</a>
-    <a href="#" class="action-link" onclick="showGameNotesLogs(); return false;">Game Notes Logs</a>
+
+  <div class="intro">
+    <h2 class="page-title">Game Pitch Log</h2>
+    <p class="intro-copy">Record pitcher usage, game notes, and rest eligibility from the field.</p>
   </div>
-</div>
 
-<h2>Game Pitch Log</h2>
-
-<div id="form-section">
+<div id="form-section" class="section">
   Date<br>
   <input type="date" id="date">
 
@@ -408,6 +591,8 @@ button:disabled{
   </div>
 </div>
 
+</div>
+
 <script>
 const API="https://script.google.com/macros/s/AKfycbwYw3hAF-O6qeiDkR9pb10OuwgXc8PrX48ZiRj2KCcrkAaPfFj9dJG4YXesRe4rsUc4/exec";
 
@@ -419,6 +604,21 @@ let currentButton = null;
 function todayDateString(){
   const t = new Date();
   return t.getFullYear() + "-" + String(t.getMonth()+1).padStart(2,"0") + "-" + String(t.getDate()).padStart(2,"0");
+}
+
+function playerName(player){
+  return typeof player === "string" ? player : String(player.name || "").trim();
+}
+
+function playerNumber(player){
+  if(typeof player === "string") return "";
+  return player.number === 0 || player.number ? String(player.number) : "";
+}
+
+function playerLabel(player){
+  const number = playerNumber(player);
+  const name = playerName(player);
+  return number ? `#${number} ${name}` : name;
 }
 
 async function load(){
@@ -449,10 +649,16 @@ function render(){
   if(!team || team.startsWith("7U")) return;
 
   roster[team].forEach(p=>{
+    const name = playerName(p);
+    const number = playerNumber(p);
     let btn = document.createElement("button");
     btn.className = "player";
-    btn.innerHTML = p + '<span class="checkmark"></span>';
-    btn.onclick = ()=>openPitchModal(p,btn);
+    btn.dataset.name = name;
+    btn.innerHTML =
+      (number ? `<span class="player-number">#${escapeHtml(number)}</span>` : "") +
+      `<span class="player-name">${escapeHtml(name)}</span>` +
+      '<span class="checkmark"></span>';
+    btn.onclick = ()=>openPitchModal(name,btn);
     div.appendChild(btn);
   });
 }
@@ -527,7 +733,7 @@ function removeFromLog(name){
     log.splice(index,1);
 
     document.querySelectorAll(".player").forEach(btn=>{
-      if(btn.innerText.includes(name)){
+      if(btn.dataset.name === name){
         btn.classList.remove("added");
         btn.querySelector(".checkmark").innerText = "";
       }
@@ -727,8 +933,10 @@ function loadTeamStatus(team){
           <tbody>
       `;
 
-      teamRoster.forEach(playerName=>{
-        const record = latestByName[playerName];
+      teamRoster.forEach(player=>{
+        const name = playerName(player);
+        const label = playerLabel(player);
+        const record = latestByName[name];
 
         let statusText = `<span class="status-good">Eligible</span>`;
         let eligibleText = "Today";
@@ -753,7 +961,7 @@ function loadTeamStatus(team){
 
         html += `
           <tr>
-            <td>${playerName}</td>
+            <td>${escapeHtml(label)}</td>
             <td>${statusText}</td>
             <td>${eligibleText}</td>
             <td>${totalPitches}</td>
