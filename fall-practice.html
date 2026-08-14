@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Noblesville Travel Baseball Fall Practice</title>
+<style>
+body{font-family:Arial,Helvetica,sans-serif;margin:0;background:#f4f1ea;color:#171717}
+.page-shell{max-width:1180px;margin:auto;padding:18px}
+.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;gap:12px;flex-wrap:wrap;background:#050505;border:1px solid #2c2618;border-radius:8px;padding:12px;box-shadow:0 10px 28px rgba(0,0,0,.16)}
+.header-left{display:flex;align-items:center;gap:15px;flex:1 1 auto;min-width:0}
+.header img.logo{width:72px;height:72px;object-fit:cover;border-radius:50%;border:2px solid #b8a05c;background:#050505}
+.header h1{font-size:1.35em;margin:0;color:#fff}.header-kicker{color:#c8b46c;font-size:12px;font-weight:bold;margin-bottom:4px;text-transform:uppercase}
+.header-actions{display:flex;gap:8px;flex-wrap:wrap}.header a.action-link{text-decoration:none;background:#1c1c1c;color:#f7f3e8;padding:10px 14px;border-radius:4px;font-size:14px;font-weight:bold;display:inline-block;border:1px solid #3c3522}.header a.action-link:hover,.header a.action-link.active{background:#b8a05c;color:#050505}
+.intro{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}.page-title{margin:0;font-size:30px}.intro-copy{color:#444;line-height:1.5;margin:8px 0 0;max-width:760px}
+.refresh-btn{border:0;border-radius:4px;background:#080808;color:#fff;padding:11px 15px;font-size:14px;font-weight:bold;cursor:pointer}.refresh-btn:hover{background:#b8a05c;color:#050505}.refresh-btn:disabled{opacity:.55;cursor:wait}
+.section{background:#fff;border:1px solid #dfd5bd;border-radius:8px;padding:14px;margin-bottom:18px;box-shadow:0 8px 20px rgba(30,24,12,.06)}
+.filters{display:grid;grid-template-columns:1fr 1fr;gap:12px}label{font-size:13px;font-weight:bold;color:#272317}select{width:100%;padding:10px;margin-top:6px;font-size:16px;border:1px solid #c8b98e;border-radius:4px;background:#fff}
+.status-row{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;color:#555;font-size:13px}.read-only{color:#326b3f;font-weight:bold}.schedule{display:grid;gap:14px}.date-group{border:1px solid #dfd5bd;border-radius:8px;overflow:hidden}.date-heading{background:#f1ead8;padding:10px 12px;font-size:16px;font-weight:bold}.practice-row{display:grid;grid-template-columns:100px 80px 1fr;gap:12px;padding:11px 12px;border-top:1px solid #eee4cc;align-items:center}.practice-time{font-weight:bold}.field{color:#555}.team-pill{display:inline-block;background:#050505;color:#fff;border-radius:999px;padding:5px 10px;font-weight:bold;width:max-content}.empty,.loading{color:#666;padding:18px;text-align:center}.error{color:#b42318;font-weight:bold;padding:18px;text-align:center}
+@media(max-width:700px){.page-shell{padding:12px}.header-left,.header-actions{width:100%}.header a.action-link{flex:1 1 auto;text-align:center}.header img.logo{width:62px;height:62px}.filters{grid-template-columns:1fr}.practice-row{grid-template-columns:82px 1fr}.team-pill{grid-column:2}.intro{align-items:flex-start}}
+</style>
+</head>
+<body>
+<div class="page-shell">
+  <div class="header">
+    <div class="header-left"><img src="nyb-logo.png" class="logo" alt="Noblesville Travel Baseball"><div><div class="header-kicker">Coach Hub</div><h1>Noblesville Travel Baseball</h1></div></div>
+    <div class="header-actions"><a href="index.html" class="action-link">Pitch Log</a><a href="drills.html" class="action-link">Drills</a><a href="fall-practice.html" class="action-link active">Fall Practice</a><a href="admin.html" class="action-link">Admin</a></div>
+  </div>
+  <div class="intro">
+    <div><h2 class="page-title">Fall Practice</h2><p class="intro-copy">August–October field assignments for 7B, 8B, 8G, 10B, 10G, 11B, 11G, and 12G.</p></div>
+    <button id="refreshBtn" class="refresh-btn" onclick="loadPractices()">Refresh from Master</button>
+  </div>
+  <div class="section filters">
+    <label>Month<select id="monthFilter" onchange="renderPractices()"><option value="All">All months</option><option>August</option><option>September</option><option>October</option></select></label>
+    <label>Team<select id="teamFilter" onchange="renderPractices()"><option value="All">All teams</option></select></label>
+  </div>
+  <div class="section status-row"><span id="count">Loading schedule…</span><span id="sourceStatus" class="read-only">Master sheet: read-only</span></div>
+  <div id="schedule" class="section loading">Loading fall practices…</div>
+</div>
+<script>
+const API="https://script.google.com/macros/s/AKfycbwYw3hAF-O6qeiDkR9pb10OuwgXc8PrX48ZiRj2KCcrkAaPfFj9dJG4YXesRe4rsUc4/exec";
+let scheduleData={teams:[],practices:[]};
+function loadPractices(){
+  const button=document.getElementById("refreshBtn");button.disabled=true;button.textContent="Refreshing…";
+  document.getElementById("schedule").innerHTML='<div class="loading">Reading the Master schedule…</div>';
+  const callbackName="fallPracticesCallback_"+Date.now();
+  const script=document.createElement("script");
+  window[callbackName]=data=>{delete window[callbackName];script.remove();button.disabled=false;button.textContent="Refresh from Master";if(data&&data.error){showError(data.message||"Unable to load practices.");return}scheduleData=data||{teams:[],practices:[]};populateTeams();document.getElementById("sourceStatus").textContent=`Master sheet: read-only · Updated ${scheduleData.refreshedAt||"now"}`;renderPractices()};
+  script.onerror=()=>{delete window[callbackName];script.remove();button.disabled=false;button.textContent="Refresh from Master";showError("Unable to reach the schedule service.")};
+  script.src=API+"?fallPractices=1&callback="+callbackName+"&_="+Date.now();document.body.appendChild(script);
+}
+function populateTeams(){const select=document.getElementById("teamFilter");const selected=select.value;select.innerHTML='<option value="All">All teams</option>'+scheduleData.teams.map(team=>`<option>${escapeHtml(team)}</option>`).join("");if(scheduleData.teams.includes(selected))select.value=selected}
+function renderPractices(){const month=document.getElementById("monthFilter").value;const team=document.getElementById("teamFilter").value;const rows=scheduleData.practices.filter(item=>(month==="All"||item.month===month)&&(team==="All"||item.team===team));document.getElementById("count").textContent=`${rows.length} practice assignment${rows.length===1?"":"s"}`;const target=document.getElementById("schedule");if(!rows.length){target.innerHTML='<div class="empty">No practices match these filters.</div>';return}const groups={};rows.forEach(item=>(groups[item.date]||(groups[item.date]=[])).push(item));target.innerHTML='<div class="schedule">'+Object.keys(groups).map(date=>{const items=groups[date];return `<section class="date-group"><div class="date-heading">${escapeHtml(items[0].day)}, ${escapeHtml(items[0].displayDate)}</div>${items.map(item=>`<div class="practice-row"><div class="practice-time">${escapeHtml(item.time)}</div><div class="field">Field ${escapeHtml(item.field)}</div><div class="team-pill">${escapeHtml(item.team)}</div></div>`).join("")}</section>`}).join("")+'</div>'}
+function showError(message){document.getElementById("count").textContent="Schedule unavailable";document.getElementById("schedule").innerHTML=`<div class="error">${escapeHtml(message)}</div>`}
+function escapeHtml(value){return String(value??"").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[char]))}
+loadPractices();
+</script>
+</body>
+</html>

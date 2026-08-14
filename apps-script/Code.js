@@ -12,6 +12,9 @@ const GC_COMPARE_START_DATE = "2026-04-18";
 const DEFAULT_SEASON_YEAR = 2026;
 const FALL_SEASON_START_DATE = "2026-08-01";
 const MISSING_OVERRIDE_TYPE = "Ignore Missing";
+const FALL_PRACTICE_SOURCE_ID = "1KpbgC-0iugmxSMpjsXFx1nPUyPRrW32QHp6Bd_G41eU";
+const FALL_PRACTICE_SOURCE_TAB = "Master";
+const FALL_PRACTICE_TEAMS = ["7B", "8B", "8G", "10B", "10G", "11B", "11G", "12G"];
 
 function doGet(e) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -41,6 +44,21 @@ function doGet(e) {
   if (params.currentWeekSchedule) {
     try {
       return outputJsonp(callback, buildCurrentWeekSchedule_());
+    } catch (err) {
+      return outputJsonp(callback, {
+        error: true,
+        message: err.message || String(err)
+      });
+    }
+  }
+
+  // =========================
+  // Read-only fall practice endpoint
+  // ?fallPractices=1&callback=...
+  // =========================
+  if (params.fallPractices) {
+    try {
+      return outputJsonp(callback, buildFallPracticeSchedule_());
     } catch (err) {
       return outputJsonp(callback, {
         error: true,
@@ -926,6 +944,126 @@ function buildCurrentWeekSchedule_() {
     totalRowsMatched: matchedCount,
     teams: teams
   };
+}
+
+function buildFallPracticeSchedule_() {
+  // This connection is intentionally read-only. It never calls a source-sheet
+  // setter, append, clear, delete, or batch-update method.
+  const source = SpreadsheetApp.openById(FALL_PRACTICE_SOURCE_ID);
+  const master = source.getSheetByName(FALL_PRACTICE_SOURCE_TAB);
+
+  if (!master) {
+    throw new Error("The Master schedule tab was not found.");
+  }
+
+  const values = master.getRange(1, 1, 120, Math.min(master.getLastColumn(), 377)).getDisplayValues();
+  const dayLayouts = [
+    { dateRow: 2, nextDateRow: 9 },
+    { dateRow: 9, nextDateRow: 16 },
+    { dateRow: 16, nextDateRow: 23 },
+    { dateRow: 23, nextDateRow: 30 },
+    { dateRow: 30, nextDateRow: 37 },
+    { dateRow: 37, nextDateRow: 43 },
+    { dateRow: 43, nextDateRow: 121 }
+  ];
+  const allowedTeams = {};
+  FALL_PRACTICE_TEAMS.forEach(team => allowedTeams[team] = true);
+
+  const practices = [];
+  const seen = {};
+
+  dayLayouts.forEach(layout => {
+    const dateIndex = layout.dateRow - 1;
+    const fieldIndex = dateIndex + 1;
+    const firstTimeIndex = dateIndex + 2;
+    const lastTimeIndex = Math.min(layout.nextDateRow - 2, values.length - 1);
+
+    values[dateIndex].forEach((rawDate, dateColumn) => {
+      const parsedDate = parseFallMasterDate_(rawDate);
+      if (!parsedDate) return;
+
+      const fieldStart = dateColumn - 3;
+      const timeColumn = fieldStart - 1;
+      if (fieldStart < 0 || timeColumn < 0) return;
+
+      for (let row = firstTimeIndex; row <= lastTimeIndex; row += 1) {
+        const time = String(values[row][timeColumn] || "").trim();
+        if (!time) continue;
+
+        for (let fieldOffset = 0; fieldOffset < 8; fieldOffset += 1) {
+          const rawTeam = String(values[row][fieldStart + fieldOffset] || "").trim();
+          const team = rawTeam.toUpperCase();
+          if (!allowedTeams[team]) continue;
+
+          const fieldLabel = String(values[fieldIndex][fieldStart + fieldOffset] || (fieldOffset + 1)).trim();
+          const key = [parsedDate.iso, time, fieldLabel, team].join("|");
+          if (seen[key]) continue;
+          seen[key] = true;
+
+          practices.push({
+            date: parsedDate.iso,
+            displayDate: parsedDate.display,
+            day: parsedDate.day,
+            month: parsedDate.month,
+            time: time,
+            field: fieldLabel,
+            team: team
+          });
+        }
+      }
+    });
+  });
+
+  practices.sort((a, b) => {
+    const byDate = a.date.localeCompare(b.date);
+    if (byDate) return byDate;
+    const byTime = practiceTimeSortValue_(a.time) - practiceTimeSortValue_(b.time);
+    if (byTime) return byTime;
+    return Number(a.field) - Number(b.field) || a.team.localeCompare(b.team);
+  });
+
+  return {
+    sourceTitle: source.getName(),
+    sourceTab: FALL_PRACTICE_SOURCE_TAB,
+    readOnly: true,
+    refreshedAt: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MMM d, yyyy h:mm a"),
+    teams: FALL_PRACTICE_TEAMS,
+    practices: practices
+  };
+}
+
+function parseFallMasterDate_(value) {
+  const match = String(value || "").trim().match(/^(8|9|10)\/(\d{1,2})(?:\/(\d{2,4}))?$/);
+  if (!match) return null;
+
+  const month = Number(match[1]);
+  const day = Number(match[2]);
+  let year = Number(match[3] || DEFAULT_SEASON_YEAR);
+  if (year < 100) year += 2000;
+
+  const date = new Date(year, month - 1, day);
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+    return null;
+  }
+
+  const monthName = ["", "", "", "", "", "", "", "", "August", "September", "October"][month];
+  return {
+    iso: Utilities.formatDate(date, Session.getScriptTimeZone(), "yyyy-MM-dd"),
+    display: Utilities.formatDate(date, Session.getScriptTimeZone(), "MMM d"),
+    day: Utilities.formatDate(date, Session.getScriptTimeZone(), "EEE"),
+    month: monthName
+  };
+}
+
+function practiceTimeSortValue_(value) {
+  const match = String(value || "").trim().match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?$/i);
+  if (!match) return 9999;
+  let hour = Number(match[1]);
+  const minute = Number(match[2] || 0);
+  const meridiem = String(match[3] || "PM").toUpperCase();
+  if (meridiem === "PM" && hour < 12) hour += 12;
+  if (meridiem === "AM" && hour === 12) hour = 0;
+  return hour * 60 + minute;
 }
 
 function buildSubmissionSummary_() {
