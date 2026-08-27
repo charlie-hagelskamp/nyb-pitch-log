@@ -672,6 +672,8 @@ button:hover{
 
   <button id="submitBtn" onclick="submitGame()">Submit</button>
 
+  <div id="summary" role="status" aria-live="assertive" aria-atomic="true" tabindex="-1" style="display:none;"></div>
+
   <div class="pitchsmart-box">
     <h3>Pitch Smart Guidelines</h3>
 
@@ -716,7 +718,6 @@ button:hover{
   </div>
 </div>
 
-<div id="summary"></div>
 <div id="dashboard" style="display:none;"></div>
 <div id="gameNotesLogs" style="display:none;"></div>
 
@@ -1059,6 +1060,9 @@ async function submitGame(){
   }
 
   const submitBtn = document.getElementById("submitBtn");
+  const summaryDiv = document.getElementById("summary");
+  summaryDiv.style.display = "none";
+  summaryDiv.innerHTML = "";
   submitBtn.disabled = true;
   submitBtn.innerHTML = "Submitting <span class='spinner'></span>";
 
@@ -1098,12 +1102,13 @@ async function submitGame(){
     await loadGameCards();
 
   }catch(e){
-    document.getElementById("summary").innerHTML = `
+    summaryDiv.innerHTML = `
       <div class="result-card warning">
         <div class="result-heading">Submission not yet confirmed</div>
         <div>${escapeHtml(e.message || String(e))}</div>
         <div style="margin-top:6px;">Your form has been kept in place. Check your connection and try again.</div>
       </div>`;
+    revealSubmissionResult();
   }
 
   submitBtn.disabled = false;
@@ -1142,6 +1147,16 @@ function renderSubmissionResult(result){
   if(level === "violation") html += `<button class="acknowledge-btn" onclick="this.disabled=true; this.textContent='Acknowledged'">I understand</button>`;
   html += `</div>`;
   document.getElementById("summary").innerHTML = html;
+  revealSubmissionResult();
+}
+
+function revealSubmissionResult(){
+  const summary = document.getElementById("summary");
+  summary.style.display = "block";
+  requestAnimationFrame(()=>{
+    summary.scrollIntoView({behavior:"smooth", block:"center"});
+    summary.focus({preventScroll:true});
+  });
 }
 
 function showDashboard(){
