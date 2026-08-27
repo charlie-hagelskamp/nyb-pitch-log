@@ -1524,7 +1524,7 @@ function buildGameCards_(team, date) {
   }
 
   let latestSync = null;
-  const games = values.map(row => {
+  const allGames = values.map(row => {
     const syncValue = row[col("Sync_Time")];
     const syncDate = syncValue ? new Date(syncValue) : null;
     if (syncDate && !isNaN(syncDate.getTime()) && (!latestSync || syncDate > latestSync)) latestSync = syncDate;
@@ -1537,15 +1537,20 @@ function buildGameCards_(team, date) {
       startTime: row[col("Start_Time")] || "",
       opponent: row[col("Opponent")] || "",
       gameStatus: row[col("Game_Status")] || "",
+      teamScore: row[col("Team_Score")] === "" ? "" : row[col("Team_Score")],
+      opponentScore: row[col("Opponent_Score")] === "" ? "" : row[col("Opponent_Score")],
+      result: row[col("Result")] || "",
       submitted: !!submittedIds[gcGameId]
     };
-  }).filter(game => (!team || game.team === team) && (!date || game.date === date));
+  });
+  const games = allGames.filter(game => (!team || game.team === team) && (!date || game.date === date));
 
   games.sort((a, b) => parseTimeMinutes_(a.startTime) - parseTimeMinutes_(b.startTime));
   games.forEach((game, index) => game.gameSequence = index + 1);
   const syncPolicy = getGameChangerSyncPolicy_();
   return {
     games: games,
+    missingSubmissions: buildCoachMissingSubmissions_(ss, team, allGames, submittedIds),
     meta: {
       lastSynced: latestSync ? formatDateTime(latestSync) : "Never",
       syncMode: syncPolicy.label,
@@ -1553,6 +1558,57 @@ function buildGameCards_(team, date) {
       loadsFromCache: true
     }
   };
+}
+
+function buildCoachMissingSubmissions_(ss, team, allGames, submittedIds) {
+  if (!team) return [];
+  const checkSheet = ss.getSheetByName("GC_Submission_Check");
+  if (!checkSheet || checkSheet.getLastRow() < 2) return [];
+
+  const ignoredKeys = getIgnoredMissingKeys_();
+  const values = checkSheet.getDataRange().getValues();
+  const headers = values.shift();
+  const teamCol = headers.indexOf("Team");
+  const dateCol = headers.indexOf("Date");
+  const missingCol = headers.indexOf("Missing_Count");
+  const statusCol = headers.indexOf("Check_Status");
+  const today = formatDateOnly(new Date());
+  const results = [];
+
+  values.forEach(row => {
+    const rowTeam = row[teamCol] || "";
+    const rowDate = normalizeDateStringGC_(row[dateCol]);
+    const missingCount = Number(row[missingCol]) || 0;
+    const status = row[statusCol] || "";
+    const key = buildTeamDateKey_(rowTeam, rowDate);
+    if (rowTeam !== team || !rowDate || rowDate >= today || missingCount <= 0) return;
+    if (status !== "Missing Submission" || ignoredKeys[key]) return;
+
+    const possibleGames = allGames.filter(game =>
+      game.team === rowTeam &&
+      game.date === rowDate &&
+      String(game.gameStatus || "").toLowerCase() === "completed" &&
+      !submittedIds[game.gcGameId]
+    ).map(game => ({
+      gcGameId: game.gcGameId,
+      startTime: game.startTime,
+      opponent: game.opponent,
+      teamScore: game.teamScore,
+      opponentScore: game.opponentScore,
+      result: game.result
+    }));
+
+    // GC_Submission_Check refreshes with the background sync, while the game
+    // picker refreshes immediately after a coach submits. Stable GC game IDs
+    // let this notice reduce/clear immediately without another source sync.
+    const effectiveMissingCount = Math.min(missingCount, possibleGames.length);
+    if (effectiveMissingCount > 0) {
+      results.push({ date: rowDate, missingCount: effectiveMissingCount, games: possibleGames });
+    }
+  });
+
+  results.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  return results.slice(0, 5);
 }
 
 function getGameChangerSyncPolicy_() {

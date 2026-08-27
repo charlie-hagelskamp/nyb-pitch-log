@@ -263,6 +263,54 @@ button:disabled{
   border-radius:8px;
 }
 
+.missing-submissions{
+  display:none;
+  margin:4px 0 16px;
+  padding:14px;
+  background:#fff4d6;
+  border:2px solid #c77b00;
+  border-left-width:7px;
+  border-radius:8px;
+  color:#4d3300;
+}
+
+.missing-submissions.visible{
+  display:block;
+}
+
+.missing-submissions-title{
+  font-size:17px;
+  font-weight:bold;
+  margin-bottom:5px;
+}
+
+.missing-submissions-copy{
+  line-height:1.4;
+  margin-bottom:10px;
+}
+
+.missing-date-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:9px 0;
+  border-top:1px solid rgba(111,72,0,.22);
+}
+
+.missing-date-details{
+  flex:1;
+  line-height:1.35;
+}
+
+.missing-date-action{
+  width:auto;
+  margin:0;
+  padding:8px 10px;
+  font-size:13px;
+  white-space:nowrap;
+}
+
 .game-picker-header{
   display:flex;
   align-items:flex-start;
@@ -454,6 +502,15 @@ button:disabled{
   .pitchsmart-table th,
   .pitchsmart-table td{
     padding:6px;
+  }
+
+  .missing-date-row{
+    align-items:stretch;
+    flex-direction:column;
+  }
+
+  .missing-date-action{
+    width:100%;
   }
 }
 
@@ -648,6 +705,8 @@ button:hover{
     <option value="">Select a team</option>
   </select>
 
+  <div id="missingSubmissions" class="missing-submissions" role="alert" aria-live="polite"></div>
+
   <div id="gamePicker" class="game-picker">
     <div class="game-picker-header">
       <div>
@@ -749,6 +808,7 @@ let currentButton = null;
 let availableGames = [];
 let selectedGame = null;
 let gameScheduleMeta = null;
+let missingPitchLogs = [];
 
 function todayDateString(){
   const t = new Date();
@@ -848,10 +908,12 @@ async function loadGameCards(){
   const date = document.getElementById("date").value;
   selectedGame = null;
   availableGames = [];
+  missingPitchLogs = [];
   document.getElementById("opponent").value = "";
 
   if(!team || !date){
     gameScheduleMeta = null;
+    renderMissingSubmissions();
     renderGameCards();
     return;
   }
@@ -862,11 +924,60 @@ async function loadGameCards(){
     const response = await jsonpRequest({gcGameCards:1, teamName:team, date:date});
     availableGames = Array.isArray(response) ? response : (response.games || []);
     gameScheduleMeta = Array.isArray(response) ? null : (response.meta || null);
+    missingPitchLogs = Array.isArray(response && response.missingSubmissions) ? response.missingSubmissions : [];
+    renderMissingSubmissions();
     renderGameCards();
   }catch(error){
     gameScheduleMeta = {error:error.message};
+    renderMissingSubmissions();
     renderGameCards();
   }
+}
+
+function renderMissingSubmissions(){
+  const target = document.getElementById("missingSubmissions");
+  if(!missingPitchLogs.length){
+    target.classList.remove("visible");
+    target.innerHTML = "";
+    return;
+  }
+
+  const total = missingPitchLogs.reduce((sum,item)=>sum + (Number(item.missingCount) || 0),0);
+  let html = `
+    <div class="missing-submissions-title">Pitch logs need attention</div>
+    <div class="missing-submissions-copy">
+      This team has ${total} completed game${total === 1 ? "" : "s"} from a previous day without a pitching submission.
+    </div>`;
+  missingPitchLogs.forEach(item=>{
+    const details = (item.games || []).map(game=>{
+      const score = game.result || scoreTextForGame(game);
+      return `${game.opponent || "Opponent TBD"}${score ? ` (${score})` : ""}`;
+    }).join(" • ");
+    html += `
+      <div class="missing-date-row">
+        <div class="missing-date-details">
+          <strong>${escapeHtml(formatDayAndDate(item.date))}</strong> — ${Number(item.missingCount) || 0} missing
+          ${details ? `<br><span>${escapeHtml(details)}</span>` : ""}
+        </div>
+        <button type="button" class="missing-date-action" onclick="reviewMissingDate('${escapeSingleQuotes(item.date)}')">Enter game</button>
+      </div>`;
+  });
+  target.innerHTML = html;
+  target.classList.add("visible");
+}
+
+function reviewMissingDate(date){
+  document.getElementById("date").value = date;
+  loadGameCards().then(()=>{
+    document.getElementById("gamePicker").scrollIntoView({behavior:"smooth",block:"start"});
+  });
+}
+
+function scoreTextForGame(game){
+  const hasTeamScore = game.teamScore !== "" && game.teamScore != null;
+  const hasOpponentScore = game.opponentScore !== "" && game.opponentScore != null;
+  if(!hasTeamScore || !hasOpponentScore) return "";
+  return `${game.teamScore}-${game.opponentScore}`;
 }
 
 async function refreshGameCards(){
@@ -907,7 +1018,10 @@ function renderGameCards(){
 
   let html = availableGames.map((game,index)=>{
     const selected = selectedGame && selectedGame.gcGameId === game.gcGameId;
-    const status = game.submitted ? "Already submitted" : (game.gameStatus || "Scheduled");
+    const score = game.result || scoreTextForGame(game);
+    const status = game.submitted
+      ? `Already submitted${score ? ` • ${score}` : ""}`
+      : (score ? `${score} • ${game.gameStatus || "Completed"}` : (game.gameStatus || "Scheduled"));
     return `
       <button type="button" class="game-card ${selected ? "selected" : ""}" onclick="selectGame(${index})" ${game.submitted ? "disabled" : ""}>
         <span class="game-card-time">${escapeHtml(game.startTime || "Time not listed")}</span>

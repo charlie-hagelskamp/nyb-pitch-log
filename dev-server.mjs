@@ -25,6 +25,25 @@ const opponents = ["Westfield Rocks","Fishers Tigers","Carmel Pups"];
 function mockGames(){
   const games = [];
   teams.forEach((team, teamIndex)=>{
+    [
+      {startTime:"5:30 PM",opponent:"Brownsburg Bulldogs",teamScore:7,opponentScore:4,result:"W 7-4"},
+      {startTime:"8:00 PM",opponent:"Avon Orioles",teamScore:3,opponentScore:5,result:"L 3-5"}
+    ].forEach((completed,index)=>{
+      games.push({
+        team,
+        gcTeamId:"local-team-" + teamIndex,
+        gcGameId:`local-${localDate(-1)}-${teamIndex}-${index + 1}`,
+        date:localDate(-1),
+        startTime:completed.startTime,
+        gameSequence:index + 1,
+        opponent:completed.opponent,
+        gameStatus:"completed",
+        teamScore:completed.teamScore,
+        opponentScore:completed.opponentScore,
+        result:completed.result,
+        submitted:false
+      });
+    });
     ["10:00 AM","2:00 PM","5:30 PM"].forEach((startTime,index)=>{
       games.push({
         team,
@@ -132,10 +151,24 @@ async function handleApi(req,res,url){
     const team = url.searchParams.get("teamName") || "";
     const date = url.searchParams.get("date") || "";
     const submittedGameIds = new Set(Array.from(submissions.values()).map(item=>item.gcGameId).filter(Boolean));
+    const allGames = mockGames();
+    const missingGames = allGames.filter(game=>
+      game.team === team &&
+      game.date < localDate() &&
+      game.gameStatus === "completed" &&
+      !submittedGameIds.has(game.gcGameId)
+    );
+    const missingByDate = {};
+    missingGames.forEach(game=>{
+      if(!missingByDate[game.date]) missingByDate[game.date] = {date:game.date,missingCount:0,games:[]};
+      missingByDate[game.date].missingCount += 1;
+      missingByDate[game.date].games.push(game);
+    });
     value = {
-      games:mockGames().filter(game=>game.team === team && game.date === date).map(game=>
+      games:allGames.filter(game=>game.team === team && game.date === date).map(game=>
         Object.assign({},game,{submitted:submittedGameIds.has(game.gcGameId)})
       ),
+      missingSubmissions:Object.values(missingByDate).sort((a,b)=>b.date.localeCompare(a.date)),
       meta:{
         lastSynced:lastSynced.toLocaleString(),
         syncMode:"local demo • active-window cache",
