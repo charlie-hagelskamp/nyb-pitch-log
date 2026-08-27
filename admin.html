@@ -521,7 +521,8 @@ th{
 </div>
 
 <script>
-const API = "https://script.google.com/macros/s/AKfycbwYw3hAF-O6qeiDkR9pb10OuwgXc8PrX48ZiRj2KCcrkAaPfFj9dJG4YXesRe4rsUc4/exec";
+const PRODUCTION_API = "https://script.google.com/macros/s/AKfycbwYw3hAF-O6qeiDkR9pb10OuwgXc8PrX48ZiRj2KCcrkAaPfFj9dJG4YXesRe4rsUc4/exec";
+const API = ["localhost","127.0.0.1"].includes(location.hostname) ? location.origin + "/api" : PRODUCTION_API;
 
 function loadAdminPage(){
   document.getElementById("syncStatus").textContent = "";

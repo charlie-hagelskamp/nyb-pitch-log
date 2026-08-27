@@ -68,6 +68,39 @@ function doGet(e) {
   }
 
   // =========================
+  // Coach-facing GameChanger game cards
+  // ?gcGameCards=1&teamName=11U%20Black&date=2026-06-01&callback=...
+  // Reads only the local GC_Games_Sync cache; it never calls GameChanger while
+  // a coach is waiting for the picker to load.
+  // =========================
+  if (params.gcGameCards) {
+    try {
+      return outputJsonp(callback, buildGameCards_(
+        String(params.teamName || "").trim(),
+        String(params.date || "").trim()
+      ));
+    } catch (err) {
+      return outputJsonp(callback, {
+        games: [],
+        meta: { error: true, message: err.message || String(err) }
+      });
+    }
+  }
+
+  // =========================
+  // Verified submission result polling endpoint
+  // ?submissionResult=1&submissionId=...&callback=...
+  // =========================
+  if (params.submissionResult) {
+    try {
+      const result = getSubmissionResult_(String(params.submissionId || "").trim());
+      return outputJsonp(callback, result ? { found: true, result: result } : { found: false });
+    } catch (err) {
+      return outputJsonp(callback, { found: false, error: true, message: err.message || String(err) });
+    }
+  }
+
+  // =========================
   // Submission summary endpoint
   // ?submissionSummary=1&callback=...
   // =========================
@@ -387,303 +420,331 @@ function doGet(e) {
 }
 
 function doPost(e) {
-  const data = JSON.parse(e.postData.contents);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
 
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const gamesSheet = ss.getSheetByName("Games");
-  const pitchingSheet = ss.getSheetByName("Pitching");
+  try {
+    const data = JSON.parse(e.postData.contents);
+    const submissionId = String(data.submissionId || Utilities.getUuid()).trim();
+    const existing = getSubmissionResult_(submissionId);
+    if (existing) return jsonOutput(existing);
 
-  if (!gamesSheet || !pitchingSheet) {
-    throw new Error("Missing Games or Pitching sheet");
-  }
-
-  const gameDate = parseLocalDate(data.date);
-  const submissionTime = new Date();
-  const gameID = new Date().getTime();
-
-  gamesSheet.appendRow([
-    gameID,
-    formatDateOnly(gameDate),
-    data.team || "",
-    data.opponent || "",
-    data.notes || "",
-    submissionTime
-  ]);
-
-  const submittedPitchers = Array.isArray(data.pitchers) ? data.pitchers : [];
-
-  if (submittedPitchers.length === 0) {
-    sendSubmissionEmail(data, gameID, gameDate, submissionTime, [], []);
-    return jsonOutput({ result: "success" });
-  }
-
-  const pitchingRows = pitchingSheet.getDataRange().getValues();
-  const headers = pitchingRows.shift();
-
-  const teamCol = headers.indexOf("Team");
-  const pitcherCol = headers.indexOf("Pitcher");
-  const eligibleCol = headers.indexOf("EligibleDate");
-  const dateCol = headers.indexOf("Date");
-  const pitchesCol = headers.indexOf("Pitches");
-
-  const allOutings = pitchingRows
-    .map(r => rowToOuting(r, teamCol, pitcherCol, eligibleCol, dateCol, pitchesCol))
-    .filter(Boolean);
-
-  const violations = [];
-  const submittedSummary = [];
-
-  submittedPitchers.forEach(p => {
-    const pitches = Number(p.pitches);
-    if (isNaN(pitches) || pitches < 0 || !p.name) return;
-
-    const restDays = calcRestDays(pitches);
-
-    const eligibleDate = new Date(gameDate);
-    eligibleDate.setDate(eligibleDate.getDate() + restDays + 1);
-    eligibleDate.setHours(0, 0, 0, 0);
-
-    const newOuting = {
-      gameID: gameID,
-      team: data.team,
-      pitcher: p.name,
-      gameDate: new Date(gameDate),
-      pitches: pitches,
-      restDays: restDays,
-      eligibleDate: new Date(eligibleDate),
-      opponent: data.opponent || "N/A",
-      isNewSubmission: true
-    };
-
-    const sameDayOutings = allOutings.filter(o =>
-      o.team === data.team &&
-      o.pitcher === p.name &&
-      datesEqual(o.gameDate, gameDate)
-    );
-
-    if (sameDayOutings.length > 0) {
-      const outingsForEmail = sameDayOutings
-        .map(o => ({
-          date: new Date(o.gameDate),
-          pitches: o.pitches,
-          eligibleDate: new Date(o.eligibleDate),
-          opponent: o.opponent || "N/A"
-        }))
-        .concat([{
-          date: new Date(newOuting.gameDate),
-          pitches: newOuting.pitches,
-          eligibleDate: new Date(newOuting.eligibleDate),
-          opponent: newOuting.opponent
-        }]);
-
-      violations.push({
-        type: "same_day",
-        team: data.team,
-        pitcher: p.name,
-        date: new Date(gameDate),
-        outings: outingsForEmail
-      });
+    if (!data.date || !data.team || !data.opponent) {
+      throw new Error("Date, team, and opponent are required");
     }
 
-    const mostRecentEarlier = findMostRecentEarlierOuting(
-      allOutings,
-      data.team,
-      p.name,
-      gameDate
-    );
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const gamesSheet = ss.getSheetByName("Games");
+    const pitchingSheet = ss.getSheetByName("Pitching");
+    if (!gamesSheet || !pitchingSheet) throw new Error("Missing Games or Pitching sheet");
 
-    if (mostRecentEarlier && gameDate < mostRecentEarlier.eligibleDate) {
-      violations.push({
-        type: "rest",
-        team: data.team,
-        pitcher: p.name,
-        sourceOuting: {
-          date: new Date(mostRecentEarlier.gameDate),
-          pitches: mostRecentEarlier.pitches,
-          eligibleDate: new Date(mostRecentEarlier.eligibleDate),
-          opponent: mostRecentEarlier.opponent || "N/A"
-        },
-        violatingOuting: {
-          date: new Date(newOuting.gameDate),
-          pitches: newOuting.pitches,
-          eligibleDate: new Date(newOuting.eligibleDate),
-          opponent: newOuting.opponent
-        }
-      });
-    }
-
-    const laterOutings = allOutings.filter(o =>
-      o.team === data.team &&
-      o.pitcher === p.name &&
-      o.gameDate > gameDate
-    );
-
-    laterOutings.forEach(later => {
-      if (later.gameDate < newOuting.eligibleDate) {
-        violations.push({
-          type: "rest",
-          team: data.team,
-          pitcher: p.name,
-          sourceOuting: {
-            date: new Date(newOuting.gameDate),
-            pitches: newOuting.pitches,
-            eligibleDate: new Date(newOuting.eligibleDate),
-            opponent: newOuting.opponent
-          },
-          violatingOuting: {
-            date: new Date(later.gameDate),
-            pitches: later.pitches,
-            eligibleDate: new Date(later.eligibleDate),
-            opponent: later.opponent || "N/A"
-          }
-        });
-      }
-    });
-
-    pitchingSheet.appendRow([
-      gameID,
-      formatDateOnly(gameDate),
-      data.team,
-      p.name,
-      pitches,
-      restDays,
-      formatDateOnly(eligibleDate)
+    const gameDate = parseLocalDate(data.date);
+    const submissionTime = new Date();
+    const gameID = new Date().getTime();
+    const gameHeaders = ensureSheetHeaders_(gamesSheet, [
+      "GameID", "Date", "Team", "Opponent", "Notes", "SubmissionTime",
+      "SubmissionID", "GC_Game_ID", "GameStartTime", "GameSequence",
+      "ScheduleMatched", "ScheduleLastSynced", "SubmittedBy"
     ]);
+    appendObjectRows_(gamesSheet, gameHeaders, [{
+      GameID: gameID,
+      Date: formatDateOnly(gameDate),
+      Team: data.team || "",
+      Opponent: data.opponent || "",
+      Notes: data.notes || "",
+      SubmissionTime: submissionTime,
+      SubmissionID: submissionId,
+      GC_Game_ID: data.gcGameId || "",
+      GameStartTime: data.gameStartTime || "",
+      GameSequence: data.gameSequence || "",
+      ScheduleMatched: data.scheduleMatched === true,
+      ScheduleLastSynced: data.scheduleLastSynced || "",
+      SubmittedBy: data.submittedBy || "Coach"
+    }]);
 
-    allOutings.push({
-      gameID: gameID,
-      team: data.team,
-      pitcher: p.name,
-      gameDate: new Date(gameDate),
-      pitches: pitches,
-      restDays: restDays,
-      eligibleDate: new Date(eligibleDate),
-      opponent: data.opponent || "N/A",
-      isNewSubmission: true
+    const pitchingHeaders = ensureSheetHeaders_(pitchingSheet, [
+      "GameID", "Date", "Team", "Pitcher", "Pitches", "RestDays", "EligibleDate",
+      "DailyTotal", "AlertLevel", "GameStartTime", "GameSequence", "SubmissionID"
+    ]);
+    const pitchingValues = pitchingSheet.getDataRange().getValues();
+    pitchingValues.shift();
+    const allOutings = pitchingValues.map((row, index) => rowToPitchOuting_(row, pitchingHeaders, index + 2)).filter(Boolean);
+    const submittedPitchers = Array.isArray(data.pitchers) ? data.pitchers : [];
+    const submittedSummary = [];
+    const rowsToAppend = [];
+
+    submittedPitchers.forEach(p => {
+      const pitches = Number(p.pitches);
+      const pitcher = String(p.name || "").trim();
+      if (!pitcher || isNaN(pitches) || pitches < 0) return;
+
+      const current = {
+        gameID: gameID,
+        team: data.team,
+        pitcher: pitcher,
+        gameDate: new Date(gameDate),
+        pitches: pitches,
+        gameStartTime: data.gameStartTime || "",
+        gameSequence: data.gameSequence || "",
+        submittedAt: submissionTime
+      };
+      const evaluation = evaluatePitchSubmission_(allOutings, current);
+
+      rowsToAppend.push({
+        GameID: gameID,
+        Date: formatDateOnly(gameDate),
+        Team: data.team,
+        Pitcher: pitcher,
+        Pitches: pitches,
+        RestDays: evaluation.restDays,
+        EligibleDate: evaluation.eligibleDate,
+        DailyTotal: evaluation.dailyTotal,
+        AlertLevel: evaluation.level,
+        GameStartTime: data.gameStartTime || "",
+        GameSequence: data.gameSequence || "",
+        SubmissionID: submissionId
+      });
+
+      updateExistingSameDayRest_(pitchingSheet, pitchingHeaders, allOutings, current, evaluation);
+      allOutings.push(current);
+      submittedSummary.push({
+        name: pitcher,
+        pitches: pitches,
+        dailyTotal: evaluation.dailyTotal,
+        restDays: evaluation.restDays,
+        eligibleDate: evaluation.eligibleDate,
+        level: evaluation.level,
+        alerts: evaluation.alerts
+      });
     });
 
-    submittedSummary.push({
-      name: p.name,
-      pitches: pitches,
-      restDays: restDays,
-      eligibleDate: new Date(eligibleDate)
-    });
-  });
+    appendObjectRows_(pitchingSheet, pitchingHeaders, rowsToAppend);
 
-  sendSubmissionEmail(data, gameID, gameDate, submissionTime, submittedSummary, violations);
+    const level = overallSubmissionLevel_(submittedSummary);
+    const result = {
+      result: "success",
+      submissionId: submissionId,
+      gameId: gameID,
+      date: formatDateOnly(gameDate),
+      team: data.team || "",
+      opponent: data.opponent || "",
+      gcGameId: data.gcGameId || "",
+      level: level,
+      pitchers: submittedSummary,
+      confirmedAt: formatDateTime(submissionTime)
+    };
+    recordSubmissionResult_(result);
 
-  if (violations.length > 0) {
-    sendViolationEmail(violations);
+    try {
+      sendSubmissionEmail(data, gameID, gameDate, submissionTime, submittedSummary);
+      const alerts = flattenSubmissionAlerts_(data.team, gameDate, submittedSummary);
+      if (alerts.length) sendRuleAlertEmail_(alerts);
+    } catch (mailError) {
+      console.error("Submission saved, but email failed: " + mailError);
+    }
+
+    return jsonOutput(result);
+  } finally {
+    lock.releaseLock();
   }
-
-  return jsonOutput({ result: "success" });
 }
 
-function sendSubmissionEmail(data, gameID, gameDate, submissionTime, submittedPitchers, violations) {
-  const subject = "NYB Game Submission";
-
+function sendSubmissionEmail(data, gameID, gameDate, submissionTime, submittedPitchers) {
   let body =
     `A game submission was recorded.\n\n` +
     `GameID: ${gameID}\n` +
     `Date: ${formatDateOnly(gameDate)}\n` +
     `Team: ${data.team || "N/A"}\n` +
     `Opponent: ${data.opponent || "N/A"}\n` +
+    `GameChanger Game ID: ${data.gcGameId || "Manual entry"}\n` +
+    `Game Time: ${data.gameStartTime || "Not provided"}\n` +
     `Submission Time: ${formatDateTime(submissionTime)}\n\n` +
-    `Notes:\n${data.notes || "N/A"}\n\n`;
+    `Notes:\n${data.notes || "N/A"}\n\nPitchers Submitted:\n`;
 
-  body += `Pitchers Submitted:\n`;
-
-  if (submittedPitchers.length === 0) {
-    body += `None\n`;
-  } else {
-    submittedPitchers.forEach(p => {
-      body +=
-        `• ${p.name}\n` +
-        `  Pitch Count: ${p.pitches}\n` +
-        `  Rest Days: ${p.restDays}\n` +
-        `  Eligible Again: ${formatDateOnly(p.eligibleDate)}\n`;
-    });
-  }
-
-  body += `\nViolation Count: ${violations.length}\n`;
-
-  MailApp.sendEmail(ADMIN_EMAIL, subject, body);
-}
-
-function sendViolationEmail(violations) {
-  const subject = "NYB PitchSmart Violation";
-
-  let body = "PitchSmart violation(s) detected.\n\n";
-
-  violations.forEach((v, i) => {
-    body += `Violation ${i + 1}\n`;
-    body += `Pitcher: ${v.pitcher}\n`;
-    body += `Team: ${v.team}\n`;
-
-    if (v.type === "same_day") {
-      body += `Issue: Pitcher appeared more than 1 time on the same day\n`;
-      body += `Date: ${formatDateOnly(v.date)}\n`;
-      body += `Outings that day:\n`;
-
-      v.outings
-        .sort((a, b) => a.pitches - b.pitches)
-        .forEach(o => {
-          body +=
-            `• Pitch Count: ${o.pitches}\n` +
-            `  Next Eligible: ${formatDateOnly(o.eligibleDate)}\n`;
-        });
-
-    } else if (v.type === "rest") {
-      body +=
-        `Required rest was not satisfied between these outings:\n\n` +
-        `Outing that started rest:\n` +
-        `• Date: ${formatDateOnly(v.sourceOuting.date)}\n` +
-        `• Pitch Count: ${v.sourceOuting.pitches}\n` +
-        `• Next Eligible: ${formatDateOnly(v.sourceOuting.eligibleDate)}\n\n` +
-        `Outing that violated rest:\n` +
-        `• Date: ${formatDateOnly(v.violatingOuting.date)}\n` +
-        `• Pitch Count: ${v.violatingOuting.pitches}\n`;
-    }
-
-    body += `\n--------------------------\n\n`;
+  if (!submittedPitchers.length) body += "None\n";
+  submittedPitchers.forEach(p => {
+    body +=
+      `• ${p.name}\n` +
+      `  This Game: ${p.pitches}\n` +
+      `  Total Today: ${p.dailyTotal}\n` +
+      `  Rest Days: ${p.restDays}\n` +
+      `  Eligible Again: ${p.eligibleDate}\n` +
+      `  Result: ${String(p.level).toUpperCase()}\n`;
   });
 
+  MailApp.sendEmail(ADMIN_EMAIL, "NYB Game Submission", body);
+}
+
+function flattenSubmissionAlerts_(team, gameDate, pitchers) {
+  const alerts = [];
+  pitchers.forEach(p => (p.alerts || []).forEach(alert => alerts.push({
+    team: team,
+    date: formatDateOnly(gameDate),
+    pitcher: p.name,
+    dailyTotal: p.dailyTotal,
+    severity: alert.severity,
+    code: alert.code,
+    message: alert.message
+  })));
+  return alerts;
+}
+
+function sendRuleAlertEmail_(alerts) {
+  const hasViolation = alerts.some(a => a.severity === "violation");
+  const subject = hasViolation ? "NYB PitchSmart Violation" : "NYB PitchSmart Warning";
+  let body = hasViolation ? "PitchSmart violation(s) detected.\n\n" : "PitchSmart warning detected.\n\n";
+  alerts.forEach((alert, index) => {
+    body +=
+      `${index + 1}. ${String(alert.severity).toUpperCase()} — ${alert.pitcher}\n` +
+      `Team: ${alert.team}\nDate: ${alert.date}\nDaily Total: ${alert.dailyTotal}\n` +
+      `${alert.message}\n\n`;
+  });
   MailApp.sendEmail(ADMIN_EMAIL, subject, body);
 }
 
-function rowToOuting(r, teamCol, pitcherCol, eligibleCol, dateCol, pitchesCol) {
-  const team = r[teamCol];
-  const pitcher = r[pitcherCol];
-  const gameDate = parseSheetDate(r[dateCol]);
-  const eligibleDate = parseSheetDate(r[eligibleCol]);
-  const pitches = Number(r[pitchesCol]) || 0;
-
-  if (!team || !pitcher || !gameDate || !eligibleDate) return null;
-
+function rowToPitchOuting_(row, headers, rowNumber) {
+  const get = name => {
+    const index = headers.indexOf(name);
+    return index >= 0 ? row[index] : "";
+  };
+  const team = get("Team");
+  const pitcher = get("Pitcher");
+  const gameDate = parseSheetDate(get("Date"));
+  if (!team || !pitcher || !gameDate) return null;
   return {
+    rowNumber: rowNumber,
+    gameID: get("GameID"),
     team: team,
     pitcher: pitcher,
     gameDate: gameDate,
-    eligibleDate: eligibleDate,
-    pitches: pitches,
-    opponent: "N/A",
-    isNewSubmission: false
+    pitches: Number(get("Pitches")) || 0,
+    gameStartTime: get("GameStartTime") || "",
+    gameSequence: get("GameSequence") || "",
+    submittedAt: null
   };
 }
 
-function findMostRecentEarlierOuting(outings, team, pitcher, gameDate) {
-  let latest = null;
+function evaluatePitchSubmission_(history, current) {
+  const playerHistory = history.filter(o => o.team === current.team && o.pitcher === current.pitcher);
+  const sameDay = playerHistory.filter(o => datesEqual(o.gameDate, current.gameDate)).concat([current]);
+  sameDay.sort(compareGameOrder_);
+  const dailyTotal = sameDay.reduce((sum, o) => sum + (Number(o.pitches) || 0), 0);
+  const restDays = calcRestDays(dailyTotal);
+  const eligibleDateObj = addDaysToDate_(current.gameDate, restDays + 1);
+  const eligibleDate = formatDateOnly(eligibleDateObj);
+  const alerts = [];
 
-  outings.forEach(o => {
-    if (o.team !== team || o.pitcher !== pitcher) return;
-    if (o.gameDate >= gameDate) return;
+  if (sameDay.length > 1) {
+    const firstGamePitches = Number(sameDay[0].pitches) || 0;
+    const warningOnly = sameDay.length === 2 && firstGamePitches <= 20;
+    alerts.push({
+      code: "same_day",
+      severity: warningOnly ? "warning" : "violation",
+      message: warningOnly
+        ? `Same-day pitching warning: first game was ${firstGamePitches} pitches (20 or fewer).`
+        : `Same-day pitching violation: ${sameDay.length} appearances; first game was ${firstGamePitches} pitches.`
+    });
+  }
 
-    if (!latest || o.gameDate > latest.gameDate) {
-      latest = o;
+  const dailyTotals = buildDailyTotals_(playerHistory);
+  const currentDateText = formatDateOnly(current.gameDate);
+  const earlierDates = Object.keys(dailyTotals).filter(date => date < currentDateText).sort();
+  if (earlierDates.length) {
+    const priorDate = earlierDates[earlierDates.length - 1];
+    const priorTotal = dailyTotals[priorDate];
+    const priorEligible = addDaysToDate_(parseLocalDate(priorDate), calcRestDays(priorTotal) + 1);
+    if (current.gameDate < priorEligible) {
+      alerts.push({
+        code: "rest",
+        severity: "violation",
+        message: `Required rest was not complete. ${priorTotal} pitches on ${priorDate} made the pitcher eligible on ${formatDateOnly(priorEligible)}.`
+      });
     }
-  });
+  }
 
-  return latest;
+  const futureDates = Object.keys(dailyTotals).filter(date => date > currentDateText).sort();
+  if (futureDates.length && parseLocalDate(futureDates[0]) < eligibleDateObj) {
+    alerts.push({
+      code: "rest",
+      severity: "violation",
+      message: `This backdated entry requires rest through ${eligibleDate}; an outing already exists on ${futureDates[0]}.`
+    });
+  }
+
+  const maximum = dailyMaximumForTeam_(current.team);
+  if (maximum && dailyTotal > maximum) {
+    alerts.push({
+      code: "daily_max",
+      severity: "violation",
+      message: `Daily maximum exceeded: ${dailyTotal} pitches (limit ${maximum}).`
+    });
+  }
+
+  const pitchingDates = {};
+  Object.keys(dailyTotals).forEach(date => pitchingDates[date] = true);
+  pitchingDates[currentDateText] = true;
+  const yesterday = formatDateOnly(addDaysToDate_(current.gameDate, -1));
+  const twoDaysAgo = formatDateOnly(addDaysToDate_(current.gameDate, -2));
+  const tomorrow = formatDateOnly(addDaysToDate_(current.gameDate, 1));
+  const twoDaysAhead = formatDateOnly(addDaysToDate_(current.gameDate, 2));
+  if ((pitchingDates[twoDaysAgo] && pitchingDates[yesterday]) ||
+      (pitchingDates[yesterday] && pitchingDates[tomorrow]) ||
+      (pitchingDates[tomorrow] && pitchingDates[twoDaysAhead])) {
+    alerts.push({ code: "three_days", severity: "violation", message: "Pitcher has appeared on three consecutive days." });
+  }
+
+  const level = alerts.some(a => a.severity === "violation")
+    ? "violation" : (alerts.some(a => a.severity === "warning") ? "warning" : "clear");
+  return { dailyTotal: dailyTotal, restDays: restDays, eligibleDate: eligibleDate, level: level, alerts: alerts };
+}
+
+function compareGameOrder_(a, b) {
+  const aSequence = Number(a.gameSequence);
+  const bSequence = Number(b.gameSequence);
+  if (aSequence && bSequence && aSequence !== bSequence) return aSequence - bSequence;
+  const aMinutes = parseTimeMinutes_(a.gameStartTime);
+  const bMinutes = parseTimeMinutes_(b.gameStartTime);
+  if (aMinutes < 24 * 60 && bMinutes < 24 * 60 && aMinutes !== bMinutes) return aMinutes - bMinutes;
+  if (a.rowNumber && !b.rowNumber) return -1;
+  if (b.rowNumber && !a.rowNumber) return 1;
+  const aSubmitted = a.submittedAt ? new Date(a.submittedAt).getTime() : 0;
+  const bSubmitted = b.submittedAt ? new Date(b.submittedAt).getTime() : 0;
+  return aSubmitted - bSubmitted;
+}
+
+function parseTimeMinutes_(value) {
+  const match = String(value || "").trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+  if (!match) return 24 * 60;
+  let hour = Number(match[1]);
+  const minute = Number(match[2]);
+  const period = String(match[3] || "").toUpperCase();
+  if (period === "AM" && hour === 12) hour = 0;
+  if (period === "PM" && hour !== 12) hour += 12;
+  return hour * 60 + minute;
+}
+
+function buildDailyTotals_(outings) {
+  const totals = {};
+  outings.forEach(o => {
+    const date = formatDateOnly(o.gameDate);
+    totals[date] = (totals[date] || 0) + (Number(o.pitches) || 0);
+  });
+  return totals;
+}
+
+function dailyMaximumForTeam_(team) {
+  const match = String(team || "").match(/(\d{1,2})\s*U/i);
+  const age = match ? Number(match[1]) : null;
+  if (age === 9 || age === 10) return 75;
+  if (age === 11 || age === 12) return 85;
+  return null;
+}
+
+function addDaysToDate_(date, days) {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  result.setHours(0, 0, 0, 0);
+  return result;
 }
 
 function calcRestDays(pitches) {
@@ -694,9 +755,80 @@ function calcRestDays(pitches) {
   return 4;
 }
 
+function overallSubmissionLevel_(pitchers) {
+  if (pitchers.some(p => p.level === "violation")) return "violation";
+  if (pitchers.some(p => p.level === "warning")) return "warning";
+  return "clear";
+}
+
+function updateExistingSameDayRest_(sheet, headers, history, current, evaluation) {
+  const restCol = headers.indexOf("RestDays") + 1;
+  const eligibleCol = headers.indexOf("EligibleDate") + 1;
+  const dailyTotalCol = headers.indexOf("DailyTotal") + 1;
+  history.filter(o => o.rowNumber && o.team === current.team && o.pitcher === current.pitcher && datesEqual(o.gameDate, current.gameDate))
+    .forEach(o => {
+      sheet.getRange(o.rowNumber, restCol).setValue(evaluation.restDays);
+      sheet.getRange(o.rowNumber, eligibleCol).setValue(evaluation.eligibleDate);
+      sheet.getRange(o.rowNumber, dailyTotalCol).setValue(evaluation.dailyTotal);
+    });
+}
+
+function ensureSheetHeaders_(sheet, requiredHeaders) {
+  let headers = sheet.getLastRow() ? sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0] : [];
+  if (!headers.length || headers.every(value => !value)) headers = [];
+  requiredHeaders.forEach(header => { if (headers.indexOf(header) < 0) headers.push(header); });
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  return headers;
+}
+
+function appendObjectRows_(sheet, headers, objects) {
+  if (!objects.length) return;
+  const rows = objects.map(object => headers.map(header => object[header] === undefined ? "" : object[header]));
+  sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, headers.length).setValues(rows);
+}
+
+function ensureSubmissionResultsSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName("Submission_Results");
+  if (!sheet) sheet = ss.insertSheet("Submission_Results");
+  ensureSheetHeaders_(sheet, ["SubmissionID", "Result_JSON", "Created_At"]);
+  return sheet;
+}
+
+function recordSubmissionResult_(result) {
+  const sheet = ensureSubmissionResultsSheet_();
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  appendObjectRows_(sheet, headers, [{
+    SubmissionID: result.submissionId,
+    Result_JSON: JSON.stringify(result),
+    Created_At: new Date()
+  }]);
+  CacheService.getScriptCache().put("submission:" + result.submissionId, JSON.stringify(result), 21600);
+}
+
+function getSubmissionResult_(submissionId) {
+  if (!submissionId) return null;
+  const cached = CacheService.getScriptCache().get("submission:" + submissionId);
+  if (cached) return JSON.parse(cached);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Submission_Results");
+  if (!sheet || sheet.getLastRow() < 2) return null;
+  const values = sheet.getDataRange().getValues();
+  const headers = values.shift();
+  const idCol = headers.indexOf("SubmissionID");
+  const resultCol = headers.indexOf("Result_JSON");
+  for (let i = values.length - 1; i >= 0; i--) {
+    if (String(values[i][idCol]) === submissionId) return JSON.parse(values[i][resultCol]);
+  }
+  return null;
+}
+
 function outputJsonp(callback, data) {
+  const safeCallback = /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(String(callback || ""))
+    ? String(callback)
+    : "dashboardCallback";
   return ContentService
-    .createTextOutput(`${callback}(${JSON.stringify(data)})`)
+    .createTextOutput(`${safeCallback}(${JSON.stringify(data)})`)
     .setMimeType(ContentService.MimeType.JAVASCRIPT);
 }
 
@@ -1365,9 +1497,117 @@ function addMissingOverride_(team, date, reason) {
    GAMECHANGER SYNC + COUNT-BASED SUBMISSION CHECK
 ========================= */
 
+function buildGameCards_(team, date) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const syncSheet = ss.getSheetByName("GC_Games_Sync");
+  if (!syncSheet || syncSheet.getLastRow() < 2) {
+    return {
+      games: [],
+      meta: {
+        lastSynced: "Never",
+        syncMode: "quiet period • daily source check",
+        message: "No cached GameChanger games are available."
+      }
+    };
+  }
+
+  const values = syncSheet.getDataRange().getValues();
+  const headers = values.shift();
+  const col = name => headers.indexOf(name);
+  const submittedIds = {};
+  const gamesSheet = ss.getSheetByName("Games");
+  if (gamesSheet && gamesSheet.getLastRow() > 1) {
+    const gameValues = gamesSheet.getDataRange().getValues();
+    const gameHeaders = gameValues.shift();
+    const gcIdCol = gameHeaders.indexOf("GC_Game_ID");
+    if (gcIdCol >= 0) gameValues.forEach(row => { if (row[gcIdCol]) submittedIds[String(row[gcIdCol])] = true; });
+  }
+
+  let latestSync = null;
+  const games = values.map(row => {
+    const syncValue = row[col("Sync_Time")];
+    const syncDate = syncValue ? new Date(syncValue) : null;
+    if (syncDate && !isNaN(syncDate.getTime()) && (!latestSync || syncDate > latestSync)) latestSync = syncDate;
+    const gcGameId = String(row[col("GC_Game_ID")] || "");
+    return {
+      team: row[col("Team")] || "",
+      gcTeamId: row[col("GC_Team_ID")] || "",
+      gcGameId: gcGameId,
+      date: normalizeDateStringGC_(row[col("Date")]),
+      startTime: row[col("Start_Time")] || "",
+      opponent: row[col("Opponent")] || "",
+      gameStatus: row[col("Game_Status")] || "",
+      submitted: !!submittedIds[gcGameId]
+    };
+  }).filter(game => (!team || game.team === team) && (!date || game.date === date));
+
+  games.sort((a, b) => parseTimeMinutes_(a.startTime) - parseTimeMinutes_(b.startTime));
+  games.forEach((game, index) => game.gameSequence = index + 1);
+  const syncPolicy = getGameChangerSyncPolicy_();
+  return {
+    games: games,
+    meta: {
+      lastSynced: latestSync ? formatDateTime(latestSync) : "Never",
+      syncMode: syncPolicy.label,
+      sourceRefreshMinutes: syncPolicy.minutes,
+      loadsFromCache: true
+    }
+  };
+}
+
+function getGameChangerSyncPolicy_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const syncSheet = ss.getSheetByName("GC_Games_Sync");
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  let nearestDays = null;
+
+  if (syncSheet && syncSheet.getLastRow() > 1) {
+    const values = syncSheet.getDataRange().getValues();
+    const headers = values.shift();
+    const dateCol = headers.indexOf("Date");
+    values.forEach(row => {
+      const gameDate = parseSheetDate(row[dateCol]);
+      if (!gameDate) return;
+      const difference = Math.round((gameDate.getTime() - today.getTime()) / 86400000);
+      if (nearestDays === null || Math.abs(difference) < Math.abs(nearestDays)) nearestDays = difference;
+    });
+  }
+
+  if (nearestDays !== null && nearestDays >= -1 && nearestDays <= 1) {
+    return { minutes: 60, label: "game window • hourly source refresh" };
+  }
+  if (nearestDays !== null && nearestDays >= -2 && nearestDays <= 7) {
+    return { minutes: 120, label: "active week • source refresh every 2 hours" };
+  }
+  return { minutes: 1440, label: "quiet period • daily source check" };
+}
+
+function smartGameChangerSync() {
+  const properties = PropertiesService.getScriptProperties();
+  const policy = getGameChangerSyncPolicy_();
+  const lastRunValue = properties.getProperty("GC_LAST_SOURCE_SYNC_AT");
+  const lastRun = lastRunValue ? new Date(lastRunValue) : null;
+  const minutesSince = lastRun && !isNaN(lastRun.getTime()) ? (new Date().getTime() - lastRun.getTime()) / 60000 : Infinity;
+  if (minutesSince < policy.minutes) {
+    return { ran: false, reason: "not_due", nextPolicy: policy };
+  }
+  syncGameChangerAndSubmissionCheck();
+  return { ran: true, reason: "due", nextPolicy: getGameChangerSyncPolicy_() };
+}
+
+function installSmartGameChangerSyncTrigger() {
+  ScriptApp.getProjectTriggers().forEach(trigger => {
+    if (trigger.getHandlerFunction() === "smartGameChangerSync") ScriptApp.deleteTrigger(trigger);
+  });
+  ScriptApp.newTrigger("smartGameChangerSync").timeBased().everyHours(1).create();
+  return "Installed hourly policy check. GameChanger itself is contacted hourly near games, every 2 hours during active weeks, and daily in quiet periods.";
+}
+
 function syncGameChangerAndSubmissionCheck() {
   syncGameChangerGames();
   refreshSubmissionCheck();
+  PropertiesService.getScriptProperties().setProperty("GC_LAST_SOURCE_SYNC_AT", new Date().toISOString());
 }
 
 function syncGameChangerGames() {

@@ -255,6 +255,135 @@ button:disabled{
   padding:12px;
 }
 
+.game-picker{
+  margin:4px 0 18px;
+  padding:14px;
+  background:#faf7ef;
+  border:1px solid #dfd5bd;
+  border-radius:8px;
+}
+
+.game-picker-header{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:10px;
+}
+
+.game-picker-title{
+  font-weight:bold;
+}
+
+.game-picker-meta{
+  color:#665d49;
+  font-size:12px;
+  margin-top:3px;
+}
+
+.refresh-games-btn{
+  width:auto;
+  padding:7px 10px;
+  margin:0;
+  font-size:13px;
+  white-space:nowrap;
+}
+
+.game-cards{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
+  gap:10px;
+}
+
+.game-card{
+  width:100%;
+  min-height:92px;
+  margin:0;
+  padding:12px;
+  text-align:left;
+  background:#fff;
+  color:#171717;
+  border:2px solid #d6c9a7;
+  border-radius:7px;
+}
+
+.game-card:hover,
+.game-card.selected{
+  background:#f1ead8;
+  color:#171717;
+  border-color:#8e7332;
+}
+
+.game-card.selected{
+  box-shadow:0 0 0 2px rgba(184,160,92,.24);
+}
+
+.game-card-time{
+  display:block;
+  color:#6a5730;
+  font-size:13px;
+  font-weight:bold;
+  margin-bottom:5px;
+}
+
+.game-card-opponent{
+  display:block;
+  font-size:16px;
+  margin-bottom:5px;
+}
+
+.game-card-status{
+  display:block;
+  color:#665d49;
+  font-size:12px;
+  font-weight:normal;
+}
+
+.game-card.manual .game-card-time{
+  color:#555;
+}
+
+.result-card{
+  border-left:7px solid #2e7d32;
+  background:#eff8ef;
+  padding:16px;
+  border-radius:7px;
+}
+
+.result-card.warning{
+  border-color:#d48b00;
+  background:#fff7df;
+}
+
+.result-card.violation{
+  border-color:#b42318;
+  background:#fff0ee;
+}
+
+.result-heading{
+  font-size:20px;
+  font-weight:bold;
+  margin-bottom:8px;
+}
+
+.result-pitcher{
+  background:rgba(255,255,255,.72);
+  border:1px solid rgba(0,0,0,.1);
+  border-radius:6px;
+  padding:10px;
+  margin-top:10px;
+}
+
+.result-alert{
+  margin-top:6px;
+  line-height:1.4;
+}
+
+.acknowledge-btn{
+  width:auto;
+  margin-top:12px;
+}
+
 .pitchsmart-box{
   margin-top:20px;
   padding:12px;
@@ -519,6 +648,17 @@ button:hover{
     <option value="">Select a team</option>
   </select>
 
+  <div id="gamePicker" class="game-picker">
+    <div class="game-picker-header">
+      <div>
+        <div class="game-picker-title">Choose the scheduled game</div>
+        <div id="gamePickerMeta" class="game-picker-meta">Select a date and team to load GameChanger games.</div>
+      </div>
+      <button id="refreshGamesBtn" type="button" class="refresh-games-btn" onclick="refreshGameCards()">Refresh list</button>
+    </div>
+    <div id="gameCards" class="game-cards"></div>
+  </div>
+
   Opponent<br>
   <input id="opponent">
 
@@ -570,6 +710,7 @@ button:hover{
       <strong>Notes:</strong><br>
       9-10 year olds: 75 pitches max per day<br>
       11-12 year olds: 85 pitches max per day<br>
+      Pitchers should not appear in multiple games on the same day<br>
       No pitcher should pitch on 3 consecutive days
     </div>
   </div>
@@ -594,13 +735,19 @@ button:hover{
 
 </div>
 
+<script src="pitch-rules.js"></script>
 <script>
-const API="https://script.google.com/macros/s/AKfycbwYw3hAF-O6qeiDkR9pb10OuwgXc8PrX48ZiRj2KCcrkAaPfFj9dJG4YXesRe4rsUc4/exec";
+const PRODUCTION_API="https://script.google.com/macros/s/AKfycbwYw3hAF-O6qeiDkR9pb10OuwgXc8PrX48ZiRj2KCcrkAaPfFj9dJG4YXesRe4rsUc4/exec";
+const LOCAL_DEV=["localhost","127.0.0.1"].includes(location.hostname);
+const API=LOCAL_DEV ? location.origin + "/api" : PRODUCTION_API;
 
 let roster = {};
 let log = [];
 let currentPitcher = null;
 let currentButton = null;
+let availableGames = [];
+let selectedGame = null;
+let gameScheduleMeta = null;
 
 function todayDateString(){
   const t = new Date();
@@ -637,8 +784,13 @@ async function load(){
     teamSelect.appendChild(opt);
   });
 
-  teamSelect.onchange = render;
+  teamSelect.onchange = function(){
+    render();
+    loadGameCards();
+  };
+  document.getElementById("date").onchange = loadGameCards;
   render();
+  renderGameCards();
 }
 
 function render(){
@@ -662,6 +814,138 @@ function render(){
     btn.onclick = ()=>openPitchModal(name,btn);
     div.appendChild(btn);
   });
+}
+
+function jsonpRequest(params, timeoutMs){
+  return new Promise((resolve,reject)=>{
+    const callbackName = "nybCallback_" + Date.now() + "_" + Math.random().toString(36).slice(2);
+    const script = document.createElement("script");
+    const query = new URLSearchParams(Object.assign({}, params, {callback:callbackName}));
+    const timer = setTimeout(()=>{
+      cleanupJsonp(callbackName);
+      reject(new Error("The request timed out."));
+    }, timeoutMs || 12000);
+
+    window[callbackName] = function(data){
+      clearTimeout(timer);
+      cleanupJsonp(callbackName);
+      resolve(data);
+    };
+    script.id = callbackName;
+    script.src = API + "?" + query.toString();
+    script.onerror = function(){
+      clearTimeout(timer);
+      cleanupJsonp(callbackName);
+      reject(new Error("Unable to reach the schedule service."));
+    };
+    document.body.appendChild(script);
+  });
+}
+
+async function loadGameCards(){
+  const team = document.getElementById("team").value;
+  const date = document.getElementById("date").value;
+  selectedGame = null;
+  availableGames = [];
+  document.getElementById("opponent").value = "";
+
+  if(!team || !date){
+    gameScheduleMeta = null;
+    renderGameCards();
+    return;
+  }
+
+  document.getElementById("gamePickerMeta").textContent = "Loading cached GameChanger games…";
+  document.getElementById("gameCards").innerHTML = "";
+  try{
+    const response = await jsonpRequest({gcGameCards:1, teamName:team, date:date});
+    availableGames = Array.isArray(response) ? response : (response.games || []);
+    gameScheduleMeta = Array.isArray(response) ? null : (response.meta || null);
+    renderGameCards();
+  }catch(error){
+    gameScheduleMeta = {error:error.message};
+    renderGameCards();
+  }
+}
+
+async function refreshGameCards(){
+  const button = document.getElementById("refreshGamesBtn");
+  button.disabled = true;
+  button.textContent = LOCAL_DEV ? "Syncing…" : "Refreshing…";
+  try{
+    if(LOCAL_DEV) await jsonpRequest({runGcSync:1});
+    await loadGameCards();
+  }finally{
+    button.disabled = false;
+    button.textContent = "Refresh list";
+  }
+}
+
+function renderGameCards(){
+  const target = document.getElementById("gameCards");
+  const meta = document.getElementById("gamePickerMeta");
+  const team = document.getElementById("team").value;
+  const date = document.getElementById("date").value;
+
+  if(!team || !date){
+    meta.textContent = "Select a date and team to load GameChanger games.";
+    target.innerHTML = manualGameCardHtml();
+    return;
+  }
+
+  if(gameScheduleMeta && gameScheduleMeta.error){
+    meta.textContent = "Schedule unavailable. You can still enter the game manually.";
+  }else if(gameScheduleMeta && gameScheduleMeta.lastSynced){
+    const mode = gameScheduleMeta.syncMode ? ` • ${gameScheduleMeta.syncMode}` : "";
+    meta.textContent = `Cached schedule last synced ${gameScheduleMeta.lastSynced}${mode}`;
+  }else{
+    meta.textContent = availableGames.length
+      ? "Choose the game once; every pitcher in this submission will be attached to it."
+      : "No matching cached games. Use manual entry or refresh the list.";
+  }
+
+  let html = availableGames.map((game,index)=>{
+    const selected = selectedGame && selectedGame.gcGameId === game.gcGameId;
+    const status = game.submitted ? "Already submitted" : (game.gameStatus || "Scheduled");
+    return `
+      <button type="button" class="game-card ${selected ? "selected" : ""}" onclick="selectGame(${index})" ${game.submitted ? "disabled" : ""}>
+        <span class="game-card-time">${escapeHtml(game.startTime || "Time not listed")}</span>
+        <span class="game-card-opponent">vs ${escapeHtml(game.opponent || "Opponent TBD")}</span>
+        <span class="game-card-status">${escapeHtml(status)}</span>
+      </button>`;
+  }).join("");
+  html += manualGameCardHtml();
+  target.innerHTML = html;
+
+  const selectable = availableGames.filter(game => !game.submitted);
+  if(!selectedGame && selectable.length === 1){
+    selectedGame = selectable[0];
+    document.getElementById("opponent").value = selectedGame.opponent || "";
+    renderGameCards();
+  }
+}
+
+function manualGameCardHtml(){
+  const selected = selectedGame && selectedGame.manual;
+  return `
+    <button type="button" class="game-card manual ${selected ? "selected" : ""}" onclick="selectManualGame()">
+      <span class="game-card-time">Game not listed?</span>
+      <span class="game-card-opponent">Enter manually</span>
+      <span class="game-card-status">Use for late schedule changes or GameChanger outages</span>
+    </button>`;
+}
+
+function selectGame(index){
+  selectedGame = availableGames[index] || null;
+  document.getElementById("opponent").value = selectedGame ? (selectedGame.opponent || "") : "";
+  renderGameCards();
+}
+
+function selectManualGame(){
+  selectedGame = {manual:true, gcGameId:"", startTime:"", gameSequence:"", scheduleMatched:false};
+  document.getElementById("opponent").value = "";
+  document.getElementById("opponent").focus();
+  renderGameCards();
 }
 
 function openPitchModal(name,btn){
@@ -758,6 +1042,17 @@ async function submitGame(){
     return;
   }
 
+  if(!selectedGame){
+    alert("Please choose a scheduled game or select manual entry");
+    return;
+  }
+
+  const opponent = document.getElementById("opponent").value.trim();
+  if(!opponent){
+    alert("Please enter an opponent");
+    return;
+  }
+
   if(!team.startsWith("7U") && log.length === 0){
     alert("No pitchers added");
     return;
@@ -767,31 +1062,31 @@ async function submitGame(){
   submitBtn.disabled = true;
   submitBtn.innerHTML = "Submitting <span class='spinner'></span>";
 
+  const submissionId = (crypto.randomUUID ? crypto.randomUUID() : "submission-" + Date.now() + "-" + Math.random().toString(36).slice(2));
   const data = {
+    submissionId: submissionId,
     date: document.getElementById("date").value,
     team: team,
-    opponent: document.getElementById("opponent").value,
+    opponent: opponent,
     notes: notes,
-    pitchers: log
+    pitchers: log,
+    gcGameId: selectedGame.gcGameId || "",
+    gameStartTime: selectedGame.startTime || "",
+    gameSequence: selectedGame.gameSequence || "",
+    scheduleMatched: !selectedGame.manual,
+    scheduleLastSynced: gameScheduleMeta ? (gameScheduleMeta.lastSynced || "") : "",
+    submittedBy: "Coach"
   };
 
   try{
-    await fetch(API,{
-      method:"POST",
-      mode:"no-cors",
-      body: JSON.stringify(data)
-    });
+    const requestOptions = {method:"POST", body:JSON.stringify(data)};
+    if(!LOCAL_DEV) requestOptions.mode = "no-cors";
+    const postResponse = await fetch(API, requestOptions);
+    let confirmed = null;
+    if(LOCAL_DEV && postResponse.ok) confirmed = await postResponse.json();
+    if(!confirmed || !confirmed.pitchers) confirmed = await waitForSubmissionResult(submissionId);
 
-    const summaryDiv = document.getElementById("summary");
-    summaryDiv.innerHTML = "<strong>Pitchers submitted:</strong><br>";
-
-    if(data.pitchers.length){
-      data.pitchers.forEach(p=>{
-        summaryDiv.innerHTML += `${p.name} — ${p.pitches} pitches, ${p.restDays} rest days<br>`;
-      });
-    } else {
-      summaryDiv.innerHTML += `No pitchers for this team entry.<br>`;
-    }
+    renderSubmissionResult(confirmed);
 
     document.getElementById("opponent").value = "";
     document.getElementById("notes").value = "";
@@ -799,13 +1094,54 @@ async function submitGame(){
     log = [];
     update();
     render();
+    selectedGame = null;
+    await loadGameCards();
 
   }catch(e){
-    alert("Submit error " + e);
+    document.getElementById("summary").innerHTML = `
+      <div class="result-card warning">
+        <div class="result-heading">Submission not yet confirmed</div>
+        <div>${escapeHtml(e.message || String(e))}</div>
+        <div style="margin-top:6px;">Your form has been kept in place. Check your connection and try again.</div>
+      </div>`;
   }
 
   submitBtn.disabled = false;
   submitBtn.innerHTML = "Submit";
+}
+
+async function waitForSubmissionResult(submissionId){
+  const started = Date.now();
+  while(Date.now() - started < 18000){
+    const result = await jsonpRequest({submissionResult:1, submissionId:submissionId}, 5000);
+    if(result && result.found && result.result) return result.result;
+    await new Promise(resolve=>setTimeout(resolve, 700));
+  }
+  throw new Error("The server did not confirm the submission within 18 seconds.");
+}
+
+function renderSubmissionResult(result){
+  const level = result.level || "clear";
+  const heading = level === "violation"
+    ? "PitchSmart violation recorded"
+    : level === "warning" ? "PitchSmart warning recorded" : "Submission confirmed";
+  const pitchers = Array.isArray(result.pitchers) ? result.pitchers : [];
+  let html = `<div class="result-card ${escapeHtml(level)}"><div class="result-heading">${heading}</div>`;
+  html += `<div>${escapeHtml(result.team || "")} vs ${escapeHtml(result.opponent || "")} • ${escapeHtml(result.date || "")}</div>`;
+  if(!pitchers.length) html += `<div class="result-pitcher">No pitchers were entered.</div>`;
+  pitchers.forEach(p=>{
+    html += `<div class="result-pitcher">
+      <strong>${escapeHtml(p.name)}</strong><br>
+      ${Number(p.pitches) || 0} this game • ${Number(p.dailyTotal) || 0} total today • ${Number(p.restDays) || 0} rest day(s)<br>
+      Eligible again: ${escapeHtml(p.eligibleDate || "")}`;
+    (p.alerts || []).forEach(alert=>{
+      html += `<div class="result-alert"><strong>${alert.severity === "warning" ? "Warning" : "Violation"}:</strong> ${escapeHtml(alert.message || "")}</div>`;
+    });
+    html += `</div>`;
+  });
+  if(level === "violation") html += `<button class="acknowledge-btn" onclick="this.disabled=true; this.textContent='Acknowledged'">I understand</button>`;
+  html += `</div>`;
+  document.getElementById("summary").innerHTML = html;
 }
 
 function showDashboard(){

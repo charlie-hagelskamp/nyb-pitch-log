@@ -1,0 +1,8 @@
+{
+  "name": "nyb-pitch-log",
+  "private": true,
+  "scripts": {
+    "dev": "node dev-server.mjs",
+    "test": "node --test tests/*.test.js"
+  }
+}
