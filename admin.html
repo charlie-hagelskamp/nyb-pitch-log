@@ -206,6 +206,17 @@ th{
   color:#444;
 }
 
+.sync-panel-copy{
+  margin:0 0 12px;
+  color:#444;
+  line-height:1.5;
+}
+
+.sync-btn:disabled{
+  opacity:.65;
+  cursor:progress;
+}
+
 .filters{
   display:flex;
   gap:18px;
@@ -480,7 +491,6 @@ th{
       <a href="drills.html" class="action-link">Drills</a>
       <a href="fall-practice.html" class="action-link">Fall Practice</a>
       <a href="admin.html" class="action-link active">Admin</a>
-      <button class="sync-btn" onclick="runGcSync()">Run GC Sync</button>
       <button class="refresh-btn" onclick="loadAdminPage()">Refresh</button>
     </div>
   </div>
@@ -490,14 +500,19 @@ th{
     <p class="intro-copy">Monitor team performance, GameChanger sync status, and missing pitch-log submissions.</p>
   </div>
 
-<div id="syncStatus" class="sync-status"></div>
+<div class="section">
+  <h2>GameChanger Sync</h2>
+  <p class="sync-panel-copy">Games sync automatically. Use this only when you need newly added or updated GameChanger information immediately.</p>
+  <button id="syncBtn" class="sync-btn" onclick="runGcSync()">Run Sync Now</button>
+  <div id="syncStatus" class="sync-status" role="status" aria-live="polite"></div>
+</div>
 
 <div class="section">
   <h2>Performance Summary</h2>
 
   <div class="filters">
     <label class="checkbox-wrap">
-      <input type="checkbox" id="includeFallToggle" onchange="loadPerformanceSummary()">
+      <input type="checkbox" id="includeFallToggle" onchange="loadPerformanceSummary()" checked>
       Include Fall Games
     </label>
   </div>
@@ -553,8 +568,10 @@ function adminLoadingHtml(message){
   return `<div class="loading-state" role="status"><span class="loading-spinner" aria-hidden="true"></span><span>${escapeHtml(message)}</span></div>`;
 }
 
-function loadAdminPage(){
-  document.getElementById("syncStatus").textContent = "";
+function loadAdminPage(preserveSyncStatus){
+  if(!preserveSyncStatus){
+    document.getElementById("syncStatus").textContent = "";
+  }
   loadPerformanceSummary();
   loadCurrentWeekSchedule();
   loadSubmissionSummary();
@@ -674,6 +691,8 @@ function loadMissingSubmissions(){
 
 function runGcSync(){
   const callbackName = "runGcSyncCallback_" + Date.now();
+  const syncBtn = document.getElementById("syncBtn");
+  syncBtn.disabled = true;
   document.getElementById("syncStatus").innerHTML = adminLoadingHtml("Running GameChanger sync…");
 
   window[callbackName] = function(data){
@@ -681,12 +700,13 @@ function runGcSync(){
       if(data && data.success){
         document.getElementById("syncStatus").textContent =
           `Sync completed at ${escapeHtml(data.ranAt || "")}`;
-        loadAdminPage();
+        loadAdminPage(true);
       } else {
         document.getElementById("syncStatus").textContent =
           `Sync failed: ${escapeHtml((data && data.message) || "Unknown error")}`;
       }
     } finally {
+      syncBtn.disabled = false;
       cleanupJsonp(callbackName);
     }
   };
@@ -696,6 +716,7 @@ function runGcSync(){
   script.src = API + "?runGcSync=1&callback=" + callbackName;
   script.onerror = function(){
     document.getElementById("syncStatus").textContent = "Sync failed.";
+    syncBtn.disabled = false;
     cleanupJsonp(callbackName);
   };
 
