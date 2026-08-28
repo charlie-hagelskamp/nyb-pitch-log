@@ -21,6 +21,10 @@ const context = {
       const month = String(date.getMonth() + 1).padStart(2,"0");
       const day = String(date.getDate()).padStart(2,"0");
       if(pattern === "yyyy-MM-dd") return `${year}-${month}-${day}`;
+      if(pattern === "h:mm a"){
+        const hour = date.getHours();
+        return `${hour % 12 || 12}:${String(date.getMinutes()).padStart(2,"0")} ${hour >= 12 ? "PM" : "AM"}`;
+      }
       return `${year}-${month}-${day} 12:00:00`;
     }
   },
@@ -53,4 +57,9 @@ test("Apps Script emits warning then violation same-day levels",()=>{
   assert.equal(warning.level,"warning");
   const violation = context.evaluatePitchSubmission_([outing({pitches:21})],outing({pitches:5,gameStartTime:"2:00 PM",gameSequence:2}));
   assert.equal(violation.level,"violation");
+});
+
+test("Apps Script formats Google Sheets time-valued cells for game cards",()=>{
+  assert.equal(context.formatTimeForDisplayGC_(new Date(1899,11,30,16,0)),"4:00 PM");
+  assert.equal(context.formatTimeForDisplayGC_("6:15 PM"),"6:15 PM");
 });

@@ -291,7 +291,7 @@ function doGet(e) {
       gcTeamId: r[gcTeamIdCol] || "",
       gcGameId: r[gcGameIdCol] || "",
       date: normalizeDateStringGC_(r[dateCol]),
-      startTime: r[timeCol] || "",
+      startTime: formatTimeForDisplayGC_(r[timeCol]),
       opponent: r[oppCol] || "",
       gameStatus: r[statusCol] || "",
       teamScore: r[teamScoreCol] === "" ? "" : r[teamScoreCol],
@@ -1534,7 +1534,7 @@ function buildGameCards_(team, date) {
       gcTeamId: row[col("GC_Team_ID")] || "",
       gcGameId: gcGameId,
       date: normalizeDateStringGC_(row[col("Date")]),
-      startTime: row[col("Start_Time")] || "",
+      startTime: formatTimeForDisplayGC_(row[col("Start_Time")]),
       opponent: row[col("Opponent")] || "",
       gameStatus: row[col("Game_Status")] || "",
       teamScore: row[col("Team_Score")] === "" ? "" : row[col("Team_Score")],
@@ -1911,6 +1911,9 @@ function normalizeDateStringGC_(value) {
 
 function formatTimeForDisplayGC_(value) {
   if (!value) return "";
+
+  const text = String(value).trim();
+  if (/^\d{1,2}:\d{2}\s*(AM|PM)$/i.test(text)) return text;
 
   const d = new Date(value);
   if (isNaN(d.getTime())) return "";
