@@ -68,6 +68,21 @@ function doGet(e) {
   }
 
   // =========================
+  // Coach drills library
+  // ?drills=1&callback=...
+  // =========================
+  if (params.drills) {
+    try {
+      return outputJsonp(callback, buildDrills_());
+    } catch (err) {
+      return outputJsonp(callback, {
+        error: true,
+        message: err.message || String(err)
+      });
+    }
+  }
+
+  // =========================
   // Coach-facing GameChanger game cards
   // ?gcGameCards=1&teamName=11U%20Black&date=2026-06-01&callback=...
   // Reads only the local GC_Games_Sync cache; it never calls GameChanger while
@@ -1162,6 +1177,39 @@ function buildFallPracticeSchedule_() {
     teams: FALL_PRACTICE_TEAMS,
     practices: practices
   };
+}
+
+function buildDrills_() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Drills");
+
+  if (!sheet || sheet.getLastRow() < 2) {
+    return [];
+  }
+
+  const values = sheet.getRange(1, 1, sheet.getLastRow(), 6).getDisplayValues();
+  const headers = values[0].map(value => String(value || "").trim().toLowerCase());
+  const columnIndex = name => headers.indexOf(name.toLowerCase());
+  const indexes = {
+    title: columnIndex("Title"),
+    category: columnIndex("Category"),
+    focus: columnIndex("Focus"),
+    source: columnIndex("Source"),
+    url: columnIndex("URL"),
+    notes: columnIndex("Notes")
+  };
+
+  if (indexes.title < 0) {
+    throw new Error("The Drills tab must include a Title column.");
+  }
+
+  return values.slice(1).map(row => ({
+    title: String(row[indexes.title] || "").trim(),
+    category: indexes.category < 0 ? "" : String(row[indexes.category] || "").trim(),
+    focus: indexes.focus < 0 ? "" : String(row[indexes.focus] || "").trim(),
+    source: indexes.source < 0 ? "" : String(row[indexes.source] || "").trim(),
+    url: indexes.url < 0 ? "" : String(row[indexes.url] || "").trim(),
+    notes: indexes.notes < 0 ? "" : String(row[indexes.notes] || "").trim()
+  })).filter(drill => drill.title);
 }
 
 function parseFallMasterDate_(value) {

@@ -63,3 +63,32 @@ test("Apps Script formats Google Sheets time-valued cells for game cards",()=>{
   assert.equal(context.formatTimeForDisplayGC_(new Date(1899,11,30,16,0)),"4:00 PM");
   assert.equal(context.formatTimeForDisplayGC_("6:15 PM"),"6:15 PM");
 });
+
+test("Apps Script reads drills from the Drills tab",()=>{
+  const rows = [
+    ["Title","Category","Focus","Source","URL","Notes"],
+    ["Infield EveryDays","Infield","Fundamentals","YouTube","https://example.com/1",""],
+    ["","Hitting","Ignored blank title","YouTube","https://example.com/2",""]
+  ];
+  context.SpreadsheetApp = {
+    getActiveSpreadsheet(){
+      return {
+        getSheetByName(name){
+          assert.equal(name,"Drills");
+          return {
+            getLastRow(){ return rows.length; },
+            getRange(row,column,rowCount,columnCount){
+              assert.deepEqual([row,column,rowCount,columnCount],[1,1,3,6]);
+              return {getDisplayValues(){ return rows; }};
+            }
+          };
+        }
+      };
+    }
+  };
+
+  const drills = context.buildDrills_();
+  assert.equal(drills.length,1);
+  assert.equal(drills[0].title,"Infield EveryDays");
+  assert.equal(drills[0].source,"YouTube");
+});

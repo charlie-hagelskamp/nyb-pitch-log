@@ -147,7 +147,9 @@ async function handleApi(req,res,url){
 
   const callback = url.searchParams.get("callback") || "callback";
   let value = {};
-  if(url.searchParams.has("gcGameCards")){
+  if(url.searchParams.has("drills")){
+    value = JSON.parse(fs.readFileSync(path.join(root,"drills.json"),"utf8"));
+  }else if(url.searchParams.has("gcGameCards")){
     const team = url.searchParams.get("teamName") || "";
     const date = url.searchParams.get("date") || "";
     const submittedGameIds = new Set(Array.from(submissions.values()).map(item=>item.gcGameId).filter(Boolean));
