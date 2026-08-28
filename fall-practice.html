@@ -15,7 +15,7 @@ body{font-family:Arial,Helvetica,sans-serif;margin:0;background:#f4f1ea;color:#1
 .refresh-btn{border:0;border-radius:4px;background:#080808;color:#fff;padding:11px 15px;font-size:14px;font-weight:bold;cursor:pointer}.refresh-btn:hover{background:#b8a05c;color:#050505}.refresh-btn:disabled{opacity:.55;cursor:wait}
 .section{background:#fff;border:1px solid #dfd5bd;border-radius:8px;padding:14px;margin-bottom:18px;box-shadow:0 8px 20px rgba(30,24,12,.06)}
 .filters{display:grid;grid-template-columns:1fr 1fr;gap:12px}label{font-size:13px;font-weight:bold;color:#272317}select{width:100%;padding:10px;margin-top:6px;font-size:16px;border:1px solid #c8b98e;border-radius:4px;background:#fff}
-.status-row{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;color:#555;font-size:13px}.read-only{color:#326b3f;font-weight:bold}.schedule{display:grid;gap:14px}.date-group{border:1px solid #dfd5bd;border-radius:8px;overflow:hidden}.date-heading{background:#f1ead8;padding:10px 12px;font-size:16px;font-weight:bold}.practice-row{display:grid;grid-template-columns:100px 80px 1fr;gap:12px;padding:11px 12px;border-top:1px solid #eee4cc;align-items:center}.practice-time{font-weight:bold}.field{color:#555}.team-pill{display:inline-block;background:#050505;color:#fff;border-radius:999px;padding:5px 10px;font-weight:bold;width:max-content}.empty,.loading{color:#666;padding:18px;text-align:center}.error{color:#b42318;font-weight:bold;padding:18px;text-align:center}
+.status-row{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;color:#555;font-size:13px}.read-only{color:#326b3f;font-weight:bold}.schedule{display:grid;gap:14px}.date-group{border:1px solid #dfd5bd;border-radius:8px;overflow:hidden}.date-heading{background:#f1ead8;padding:10px 12px;font-size:16px;font-weight:bold}.practice-row{display:grid;grid-template-columns:100px 80px 1fr;gap:12px;padding:11px 12px;border-top:1px solid #eee4cc;align-items:center}.practice-time{font-weight:bold}.field{color:#555}.team-pill{display:inline-block;background:#050505;color:#fff;border-radius:999px;padding:5px 10px;font-weight:bold;width:max-content}.empty,.loading{color:#666;padding:18px;text-align:center}.loading-state{display:flex;align-items:center;justify-content:center;gap:10px;font-weight:bold}.loading-spinner{width:20px;height:20px;border:3px solid #ded6c4;border-top-color:#8e7332;border-radius:50%;animation:practiceSpin .8s linear infinite}.error{color:#b42318;font-weight:bold;padding:18px;text-align:center}@keyframes practiceSpin{to{transform:rotate(360deg)}}
 @media(max-width:700px){.page-shell{padding:12px}.header-left,.header-actions{width:100%}.header a.action-link{flex:1 1 auto;text-align:center}.header img.logo{width:62px;height:62px}.filters{grid-template-columns:1fr}.practice-row{grid-template-columns:82px 1fr}.team-pill{grid-column:2}.intro{align-items:flex-start}}
 </style>
 </head>
@@ -34,14 +34,14 @@ body{font-family:Arial,Helvetica,sans-serif;margin:0;background:#f4f1ea;color:#1
     <label>Team<select id="teamFilter" onchange="renderPractices()"><option value="All">All teams</option></select></label>
   </div>
   <div class="section status-row"><span id="count">Loading schedule…</span><span id="sourceStatus" class="read-only">Master sheet: read-only</span></div>
-  <div id="schedule" class="section loading">Loading fall practices…</div>
+  <div id="schedule" class="section loading"><div class="loading-state"><span class="loading-spinner"></span><span>Loading fall practices…</span></div></div>
 </div>
 <script>
 const API="https://script.google.com/macros/s/AKfycbwYw3hAF-O6qeiDkR9pb10OuwgXc8PrX48ZiRj2KCcrkAaPfFj9dJG4YXesRe4rsUc4/exec";
 let scheduleData={teams:[],practices:[]};
 function loadPractices(){
   const button=document.getElementById("refreshBtn");button.disabled=true;button.textContent="Refreshing…";
-  document.getElementById("schedule").innerHTML='<div class="loading">Reading the Master schedule…</div>';
+  document.getElementById("schedule").innerHTML='<div class="loading loading-state" role="status"><span class="loading-spinner" aria-hidden="true"></span><span>Reading the Master schedule…</span></div>';
   const callbackName="fallPracticesCallback_"+Date.now();
   const script=document.createElement("script");
   window[callbackName]=data=>{delete window[callbackName];script.remove();button.disabled=false;button.textContent="Refresh from Master";if(data&&data.error){showError(data.message||"Unable to load practices.");return}scheduleData=data||{teams:[],practices:[]};populateTeams();document.getElementById("sourceStatus").textContent=`Master sheet: read-only · Updated ${scheduleData.refreshedAt||"now"}`;renderPractices()};

@@ -153,6 +153,30 @@ button:disabled{
   margin-left:8px;
 }
 
+.loading-state{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  min-height:48px;
+  color:#554b35;
+  font-weight:bold;
+  text-align:center;
+}
+
+.loading-state .spinner{
+  width:20px;
+  height:20px;
+  margin:0;
+  border-color:#ded6c4;
+  border-top-color:#8e7332;
+  flex:0 0 auto;
+}
+
+.game-cards .loading-state{
+  grid-column:1 / -1;
+}
+
 @keyframes spin{
   0%{transform:rotate(0deg);}
   100%{transform:rotate(360deg);}
@@ -276,6 +300,12 @@ button:disabled{
 
 .missing-submissions.visible{
   display:block;
+}
+
+.missing-submissions.loading-check{
+  background:#f7f5ef;
+  border-color:#9b8b63;
+  color:#554b35;
 }
 
 .missing-submissions-title{
@@ -620,6 +650,12 @@ textarea:focus{
   border-color:#9d833e;
 }
 
+#date{
+  display:block;
+  width:220px;
+  max-width:100%;
+}
+
 button{
   background:#080808;
   color:#fff;
@@ -693,7 +729,6 @@ button:hover{
 
   <div class="intro">
     <h2 class="page-title">Game Pitch Log</h2>
-    <p class="intro-copy">Record pitcher usage, game notes, and rest eligibility from the field.</p>
   </div>
 
 <div id="form-section" class="section">
@@ -701,8 +736,8 @@ button:hover{
   <input type="date" id="date">
 
   Team<br>
-  <select id="team">
-    <option value="">Select a team</option>
+  <select id="team" disabled>
+    <option value="">Loading teams…</option>
   </select>
 
   <div id="missingSubmissions" class="missing-submissions" role="alert" aria-live="polite"></div>
@@ -837,6 +872,7 @@ async function load(){
   roster = await res.json();
 
   const teamSelect = document.getElementById("team");
+  teamSelect.innerHTML = '<option value="">Select a team</option>';
 
   Object.keys(roster).forEach(t=>{
     let opt = document.createElement("option");
@@ -844,6 +880,7 @@ async function load(){
     opt.text = t;
     teamSelect.appendChild(opt);
   });
+  teamSelect.disabled = false;
 
   teamSelect.onchange = function(){
     render();
@@ -918,8 +955,9 @@ async function loadGameCards(){
     return;
   }
 
+  showMissingSubmissionsLoading();
   document.getElementById("gamePickerMeta").textContent = "Loading cached GameChanger games…";
-  document.getElementById("gameCards").innerHTML = "";
+  document.getElementById("gameCards").innerHTML = loadingStateHtml("Loading scheduled games…");
   try{
     const response = await jsonpRequest({gcGameCards:1, teamName:team, date:date});
     availableGames = Array.isArray(response) ? response : (response.games || []);
@@ -934,8 +972,19 @@ async function loadGameCards(){
   }
 }
 
+function loadingStateHtml(message){
+  return `<div class="loading-state" role="status"><span class="spinner" aria-hidden="true"></span><span>${escapeHtml(message)}</span></div>`;
+}
+
+function showMissingSubmissionsLoading(){
+  const target = document.getElementById("missingSubmissions");
+  target.innerHTML = loadingStateHtml("Checking for previous games missing pitch logs…");
+  target.classList.add("visible","loading-check");
+}
+
 function renderMissingSubmissions(){
   const target = document.getElementById("missingSubmissions");
+  target.classList.remove("loading-check");
   if(!missingPitchLogs.length){
     target.classList.remove("visible");
     target.innerHTML = "";
@@ -1359,7 +1408,7 @@ function formatDayAndDate(yyyyMmDd){
 function loadTeamStatus(team){
   if(!team) return;
 
-  document.getElementById("teamStatus").innerHTML = "Loading...";
+  document.getElementById("teamStatus").innerHTML = loadingStateHtml("Loading pitching status…");
 
   const callbackName = "dashboardCallback_" + Date.now();
 
@@ -1462,7 +1511,7 @@ function loadTeamStatus(team){
 function loadGameNotesLogs(team){
   if(!team) return;
 
-  document.getElementById("notesResults").innerHTML = "Loading...";
+  document.getElementById("notesResults").innerHTML = loadingStateHtml("Loading game notes…");
 
   const callbackName = "gameNotesCallback_" + Date.now();
 

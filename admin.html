@@ -169,6 +169,31 @@ th{
   color:#555;
 }
 
+.loading-state{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  min-height:52px;
+  grid-column:1 / -1;
+  color:#555;
+  font-weight:bold;
+}
+
+.loading-spinner{
+  width:20px;
+  height:20px;
+  border:3px solid #dce1e8;
+  border-top-color:#476489;
+  border-radius:50%;
+  animation:adminSpin .8s linear infinite;
+  flex:0 0 auto;
+}
+
+@keyframes adminSpin{
+  to{transform:rotate(360deg);}
+}
+
 .footer-note{
   font-size:12px;
   color:#666;
@@ -479,17 +504,17 @@ th{
 
   <div style="margin-bottom:16px;">
     <h3>Overall Organization</h3>
-    <div id="overallOrgCards" class="cards loading">Loading...</div>
+    <div id="overallOrgCards" class="cards loading"><div class="loading-state"><span class="loading-spinner"></span><span>Loading performance…</span></div></div>
   </div>
 
   <div class="grid-2">
     <div>
       <h3>Current Week (Monday-Sunday)</h3>
-      <div id="currentWeekOrgCards" class="cards loading">Loading...</div>
+      <div id="currentWeekOrgCards" class="cards loading"><div class="loading-state"><span class="loading-spinner"></span><span>Loading current week…</span></div></div>
     </div>
     <div>
       <h3>Previous Week (Monday-Sunday)</h3>
-      <div id="previousWeekOrgCards" class="cards loading">Loading...</div>
+      <div id="previousWeekOrgCards" class="cards loading"><div class="loading-state"><span class="loading-spinner"></span><span>Loading previous week…</span></div></div>
     </div>
   </div>
 
@@ -498,24 +523,24 @@ th{
 
 <div class="section">
   <h2>Team Performance</h2>
-  <div id="teamPerformance" class="loading">Loading...</div>
+  <div id="teamPerformance" class="loading"><div class="loading-state"><span class="loading-spinner"></span><span>Loading team performance…</span></div></div>
 </div>
 
 <div class="section">
   <h2>Current Week Schedule</h2>
-  <div id="currentWeekSchedule" class="loading">Loading...</div>
+  <div id="currentWeekSchedule" class="loading"><div class="loading-state"><span class="loading-spinner"></span><span>Loading schedule…</span></div></div>
   <div id="currentWeekScheduleNote" class="footer-note"></div>
 </div>
 
 <div class="section">
   <h2>Submission Summary</h2>
-  <div id="submissionCards" class="cards loading">Loading...</div>
+  <div id="submissionCards" class="cards loading"><div class="loading-state"><span class="loading-spinner"></span><span>Loading submission summary…</span></div></div>
   <div id="submissionNote" class="footer-note"></div>
 </div>
 
 <div class="section">
   <h2>Missing Submissions</h2>
-  <div id="missingSummary" class="loading">Loading...</div>
+  <div id="missingSummary" class="loading"><div class="loading-state"><span class="loading-spinner"></span><span>Checking missing submissions…</span></div></div>
 </div>
 
 </div>
@@ -523,6 +548,10 @@ th{
 <script>
 const PRODUCTION_API = "https://script.google.com/macros/s/AKfycbwYw3hAF-O6qeiDkR9pb10OuwgXc8PrX48ZiRj2KCcrkAaPfFj9dJG4YXesRe4rsUc4/exec";
 const API = ["localhost","127.0.0.1"].includes(location.hostname) ? location.origin + "/api" : PRODUCTION_API;
+
+function adminLoadingHtml(message){
+  return `<div class="loading-state" role="status"><span class="loading-spinner" aria-hidden="true"></span><span>${escapeHtml(message)}</span></div>`;
+}
 
 function loadAdminPage(){
   document.getElementById("syncStatus").textContent = "";
@@ -533,6 +562,10 @@ function loadAdminPage(){
 }
 
 function loadPerformanceSummary(){
+  document.getElementById("overallOrgCards").innerHTML = adminLoadingHtml("Loading performance…");
+  document.getElementById("currentWeekOrgCards").innerHTML = adminLoadingHtml("Loading current week…");
+  document.getElementById("previousWeekOrgCards").innerHTML = adminLoadingHtml("Loading previous week…");
+  document.getElementById("teamPerformance").innerHTML = adminLoadingHtml("Loading team performance…");
   const callbackName = "performanceSummaryCallback_" + Date.now();
   const includeFall = document.getElementById("includeFallToggle").checked ? "1" : "0";
 
@@ -561,6 +594,7 @@ function loadPerformanceSummary(){
 }
 
 function loadCurrentWeekSchedule(){
+  document.getElementById("currentWeekSchedule").innerHTML = adminLoadingHtml("Loading schedule…");
   const callbackName = "currentWeekScheduleCallback_" + Date.now();
 
   window[callbackName] = function(data){
@@ -588,6 +622,7 @@ function loadCurrentWeekSchedule(){
 }
 
 function loadSubmissionSummary(){
+  document.getElementById("submissionCards").innerHTML = adminLoadingHtml("Loading submission summary…");
   const callbackName = "submissionSummaryCallback_" + Date.now();
 
   window[callbackName] = function(data){
@@ -615,6 +650,7 @@ function loadSubmissionSummary(){
 }
 
 function loadMissingSubmissions(){
+  document.getElementById("missingSummary").innerHTML = adminLoadingHtml("Checking missing submissions…");
   const callbackName = "adminMissingCallback_" + Date.now();
 
   window[callbackName] = function(data){
@@ -638,7 +674,7 @@ function loadMissingSubmissions(){
 
 function runGcSync(){
   const callbackName = "runGcSyncCallback_" + Date.now();
-  document.getElementById("syncStatus").textContent = "Running GameChanger sync...";
+  document.getElementById("syncStatus").innerHTML = adminLoadingHtml("Running GameChanger sync…");
 
   window[callbackName] = function(data){
     try{
