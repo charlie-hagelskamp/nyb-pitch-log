@@ -33,6 +33,10 @@
     return null;
   }
 
+  function pitcherUsageRequired(team){
+    return !["7U Black","8U Black","8U Gold"].includes(String(team || ""));
+  }
+
   function groupDaily(history){
     const totals = {};
     (history || []).forEach(item => {
@@ -128,5 +132,5 @@
     return {dailyTotal, restDays, eligibleDate, level, alerts};
   }
 
-  return {restDaysForPitches, addDays, teamAge, dailyMaximum, evaluatePitcherSubmission};
+  return {restDaysForPitches, addDays, teamAge, dailyMaximum, pitcherUsageRequired, evaluatePitcherSubmission};
 });

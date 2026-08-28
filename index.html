@@ -287,6 +287,105 @@ button:disabled{
   border-radius:8px;
 }
 
+.form-step{
+  margin-bottom:18px;
+}
+
+.step-heading,
+.step-summary{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-bottom:7px;
+  color:#171717;
+  font-weight:bold;
+}
+
+.step-heading.with-action{
+  justify-content:space-between;
+}
+
+.step-heading-main{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+.step-number{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:28px;
+  height:28px;
+  flex:0 0 28px;
+  border-radius:50%;
+  background:#b8a05c;
+  color:#050505;
+  font-size:14px;
+  font-weight:bold;
+}
+
+.field-label{
+  display:block;
+  font-weight:bold;
+  margin-top:10px;
+}
+
+.pitcher-step{
+  border:1px solid #dfd5bd;
+  border-radius:8px;
+  background:#faf7ef;
+  padding:12px;
+}
+
+.pitcher-step summary{
+  cursor:pointer;
+  list-style:none;
+  margin:0;
+}
+
+.pitcher-step summary::-webkit-details-marker{
+  display:none;
+}
+
+.pitcher-step summary::after{
+  content:"+";
+  margin-left:auto;
+  font-size:22px;
+}
+
+.pitcher-step[open] summary::after{
+  content:"−";
+}
+
+.step-title-group{
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+}
+
+.step-helper{
+  color:#665d49;
+  font-size:12px;
+  font-weight:normal;
+}
+
+.pitcher-step-content{
+  margin-top:12px;
+}
+
+.sr-only{
+  position:absolute;
+  width:1px;
+  height:1px;
+  padding:0;
+  margin:-1px;
+  overflow:hidden;
+  clip:rect(0,0,0,0);
+  white-space:nowrap;
+  border:0;
+}
+
 .missing-submissions{
   display:none;
   margin:4px 0 16px;
@@ -736,39 +835,59 @@ button:hover{
   </div>
 
 <div id="form-section" class="section">
-  Date<br>
-  <input type="date" id="date">
+  <div class="form-step">
+    <label class="step-heading" for="date"><span class="step-number">1</span><span>Date</span></label>
+    <input type="date" id="date">
+  </div>
 
-  Team<br>
-  <select id="team" disabled>
-    <option value="">Loading teams…</option>
-  </select>
+  <div class="form-step">
+    <label class="step-heading" for="team"><span class="step-number">2</span><span>Team</span></label>
+    <select id="team" disabled>
+      <option value="">Loading teams…</option>
+    </select>
+  </div>
 
   <div id="missingSubmissions" class="missing-submissions" role="alert" aria-live="polite"></div>
 
-  <div id="gamePicker" class="game-picker">
-    <div class="game-picker-header">
-      <div>
-        <div class="game-picker-title">Choose the scheduled game</div>
-        <div id="gamePickerMeta" class="game-picker-meta">Select a date and team to load GameChanger games.</div>
+  <div class="form-step">
+    <div class="step-heading with-action">
+      <div class="step-heading-main">
+        <span class="step-number">3</span>
+        <span>Scheduled game</span>
       </div>
-      <button id="refreshGamesBtn" type="button" class="refresh-games-btn" onclick="refreshGameCards()">Refresh list</button>
+      <button id="refreshGamesBtn" type="button" class="refresh-games-btn" onclick="refreshGameCards()">Refresh games</button>
     </div>
-    <div id="gameCards" class="game-cards"></div>
+    <div id="gamePicker" class="game-picker">
+      <div id="gamePickerMeta" class="sr-only" role="status" aria-live="polite">Select a date and team to load games.</div>
+      <div id="gameCards" class="game-cards"></div>
+    </div>
+    <label class="field-label" for="opponent">Opponent</label>
+    <input id="opponent">
   </div>
 
-  Opponent<br>
-  <input id="opponent">
+  <div class="form-step">
+    <label class="step-heading" for="notes"><span class="step-number">4</span><span>Game notes</span></label>
+    <textarea id="notes" rows="4"></textarea>
+  </div>
 
-  <div id="pitchers"></div>
+  <details id="pitcherStep" class="form-step pitcher-step">
+    <summary class="step-summary">
+      <span class="step-number">5</span>
+      <span class="step-title-group">
+        <span>Pitcher usage</span>
+        <span id="pitcherRequirement" class="step-helper">Select a team to continue</span>
+      </span>
+    </summary>
+    <div class="pitcher-step-content">
+      <div id="pitchers"></div>
+      <div id="log"></div>
+    </div>
+  </details>
 
-  <h3>Pitch Log</h3>
-  <div id="log"></div>
-
-  Game Notes<br>
-  <textarea id="notes" rows="4"></textarea>
-
-  <button id="submitBtn" onclick="submitGame()">Submit</button>
+  <div class="form-step">
+    <div class="step-heading"><span class="step-number">6</span><span>Submit</span></div>
+    <button id="submitBtn" onclick="submitGame()">Submit game report</button>
+  </div>
 
   <div id="summary" role="status" aria-live="assertive" aria-atomic="true" tabindex="-1" style="display:none;"></div>
 
@@ -849,6 +968,10 @@ let selectedGame = null;
 let gameScheduleMeta = null;
 let missingPitchLogs = [];
 
+function isNotesFirstTeam(team){
+  return !PitchRules.pitcherUsageRequired(team);
+}
+
 function todayDateString(){
   const t = new Date();
   return t.getFullYear() + "-" + String(t.getMonth()+1).padStart(2,"0") + "-" + String(t.getDate()).padStart(2,"0");
@@ -887,6 +1010,8 @@ async function load(){
   teamSelect.disabled = false;
 
   teamSelect.onchange = function(){
+    log = [];
+    update();
     render();
     loadGameCards();
   };
@@ -898,12 +1023,24 @@ async function load(){
 function render(){
   const team = document.getElementById("team").value;
   const div = document.getElementById("pitchers");
+  const pitcherStep = document.getElementById("pitcherStep");
+  const requirement = document.getElementById("pitcherRequirement");
 
   div.innerHTML = "";
 
-  if(!team || team.startsWith("7U")) return;
+  if(!team){
+    pitcherStep.open = false;
+    requirement.textContent = "Select a team to continue";
+    return;
+  }
 
-  roster[team].forEach(p=>{
+  const optional = isNotesFirstTeam(team);
+  pitcherStep.open = !optional;
+  requirement.textContent = optional
+    ? "Optional for this team — game notes are all that is required"
+    : "Required — select each pitcher and enter a pitch count";
+
+  (roster[team] || []).forEach(p=>{
     const name = playerName(p);
     const number = playerNumber(p);
     let btn = document.createElement("button");
@@ -960,7 +1097,7 @@ async function loadGameCards(){
   }
 
   showMissingSubmissionsLoading();
-  document.getElementById("gamePickerMeta").textContent = "Loading cached GameChanger games…";
+  document.getElementById("gamePickerMeta").textContent = "Loading scheduled games…";
   document.getElementById("gameCards").innerHTML = loadingStateHtml("Loading scheduled games…");
   try{
     const response = await jsonpRequest({gcGameCards:1, teamName:team, date:date});
@@ -1042,7 +1179,7 @@ async function refreshGameCards(){
     await loadGameCards();
   }finally{
     button.disabled = false;
-    button.textContent = "Refresh list";
+    button.textContent = "Refresh games";
   }
 }
 
@@ -1053,7 +1190,7 @@ function renderGameCards(){
   const date = document.getElementById("date").value;
 
   if(!team || !date){
-    meta.textContent = "Select a date and team to load GameChanger games.";
+    meta.textContent = "Select a date and team to load games.";
     target.innerHTML = manualGameCardHtml();
     return;
   }
@@ -1061,12 +1198,11 @@ function renderGameCards(){
   if(gameScheduleMeta && gameScheduleMeta.error){
     meta.textContent = "Schedule unavailable. You can still enter the game manually.";
   }else if(gameScheduleMeta && gameScheduleMeta.lastSynced){
-    const mode = gameScheduleMeta.syncMode ? ` • ${gameScheduleMeta.syncMode}` : "";
-    meta.textContent = `Cached schedule last synced ${gameScheduleMeta.lastSynced}${mode}`;
+    meta.textContent = "Schedule loaded.";
   }else{
     meta.textContent = availableGames.length
-      ? "Choose the game once; every pitcher in this submission will be attached to it."
-      : "No matching cached games. Use manual entry or refresh the list.";
+      ? "Choose a scheduled game."
+      : "No matching games. Use manual entry or refresh the games.";
   }
 
   let html = availableGames.map((game,index)=>{
@@ -1099,7 +1235,7 @@ function manualGameCardHtml(){
     <button type="button" class="game-card manual ${selected ? "selected" : ""}" onclick="selectManualGame()">
       <span class="game-card-time">Game not listed?</span>
       <span class="game-card-opponent">Enter manually</span>
-      <span class="game-card-status">Use for late schedule changes or GameChanger outages</span>
+      <span class="game-card-status">Use for late schedule changes</span>
     </button>`;
 }
 
@@ -1197,11 +1333,11 @@ function removeFromLog(name){
 }
 
 async function submitGame(){
-  const notes = document.getElementById("notes").value.trim();
+  const date = document.getElementById("date").value;
   const team = document.getElementById("team").value;
 
-  if(!notes){
-    alert("Please enter Game Notes");
+  if(!date){
+    alert("Please select a date");
     return;
   }
 
@@ -1221,7 +1357,13 @@ async function submitGame(){
     return;
   }
 
-  if(!team.startsWith("7U") && log.length === 0){
+  const notes = document.getElementById("notes").value.trim();
+  if(!notes){
+    alert("Please enter Game Notes");
+    return;
+  }
+
+  if(!isNotesFirstTeam(team) && log.length === 0){
     alert("No pitchers added");
     return;
   }
@@ -1236,7 +1378,7 @@ async function submitGame(){
   const submissionId = (crypto.randomUUID ? crypto.randomUUID() : "submission-" + Date.now() + "-" + Math.random().toString(36).slice(2));
   const data = {
     submissionId: submissionId,
-    date: document.getElementById("date").value,
+    date: date,
     team: team,
     opponent: opponent,
     notes: notes,
@@ -1279,7 +1421,7 @@ async function submitGame(){
   }
 
   submitBtn.disabled = false;
-  submitBtn.innerHTML = "Submit";
+  submitBtn.innerHTML = "Submit game report";
 }
 
 async function waitForSubmissionResult(submissionId){

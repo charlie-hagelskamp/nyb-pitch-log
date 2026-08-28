@@ -50,3 +50,17 @@ test("11U daily maximum is 85",()=>{
   const result = rules.evaluatePitcherSubmission([],outing({pitches:86}));
   assert.equal(result.alerts.some(a=>a.code === "daily_max"),true);
 });
+
+test("7U Black and both 8U teams can submit notes without pitchers",()=>{
+  assert.equal(rules.pitcherUsageRequired("7U Black"),false);
+  assert.equal(rules.pitcherUsageRequired("8U Black"),false);
+  assert.equal(rules.pitcherUsageRequired("8U Gold"),false);
+});
+
+test("older teams still require pitcher usage",()=>{
+  assert.equal(rules.pitcherUsageRequired("10U Black"),true);
+  assert.equal(rules.pitcherUsageRequired("10U Gold"),true);
+  assert.equal(rules.pitcherUsageRequired("11U Black"),true);
+  assert.equal(rules.pitcherUsageRequired("11U Gold"),true);
+  assert.equal(rules.pitcherUsageRequired("12U Gold"),true);
+});
