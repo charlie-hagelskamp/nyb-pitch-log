@@ -217,6 +217,92 @@ th{
   cursor:progress;
 }
 
+.traffic-cards{
+  grid-template-columns:repeat(3, minmax(0,1fr));
+  margin-bottom:16px;
+}
+
+.traffic-layout{
+  display:grid;
+  grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);
+  gap:18px;
+}
+
+.traffic-panel{
+  border:1px solid #dfd5bd;
+  border-radius:8px;
+  padding:14px;
+  background:#fffdf8;
+}
+
+.traffic-chart{
+  display:grid;
+  gap:7px;
+}
+
+.traffic-day{
+  display:grid;
+  grid-template-columns:48px minmax(90px,1fr) 54px;
+  align-items:center;
+  gap:8px;
+  font-size:12px;
+}
+
+.traffic-track{
+  height:12px;
+  border-radius:999px;
+  background:#eee7d7;
+  overflow:hidden;
+}
+
+.traffic-fill{
+  display:block;
+  height:100%;
+  border-radius:inherit;
+  background:#b8a05c;
+  min-width:0;
+}
+
+.traffic-day-value{
+  color:#555;
+  text-align:right;
+}
+
+.traffic-breakdowns{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:14px;
+}
+
+.traffic-list h4{
+  margin:0 0 7px;
+  font-size:13px;
+}
+
+.traffic-list-row{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  border-top:1px solid #eee7d7;
+  padding:7px 0;
+  font-size:12px;
+}
+
+.traffic-list-row:first-of-type{
+  border-top:none;
+}
+
+.traffic-list-label{
+  min-width:0;
+  overflow-wrap:anywhere;
+}
+
+.traffic-list-value{
+  flex:0 0 auto;
+  color:#555;
+  white-space:nowrap;
+}
+
 .filters{
   display:flex;
   gap:18px;
@@ -311,8 +397,13 @@ th{
 
 @media (max-width:900px){
   .cards,
-  .grid-2{
+  .grid-2,
+  .traffic-layout{
     grid-template-columns:1fr;
+  }
+
+  .traffic-cards{
+    grid-template-columns:repeat(2, minmax(0,1fr));
   }
 }
 
@@ -344,6 +435,10 @@ th{
   .schedule-team-header{
     flex-direction:column;
     align-items:flex-start;
+  }
+
+  .traffic-breakdowns{
+    grid-template-columns:1fr;
   }
 }
 
@@ -507,6 +602,22 @@ th{
 </div>
 
 <div class="section">
+  <h2>Site Traffic</h2>
+  <div id="trafficCards" class="cards traffic-cards loading"><div class="loading-state"><span class="loading-spinner"></span><span>Loading site traffic…</span></div></div>
+  <div class="traffic-layout">
+    <div class="traffic-panel">
+      <h3>Page Views — Last 14 Days</h3>
+      <div id="trafficDaily" class="loading"><div class="loading-state"><span class="loading-spinner"></span><span>Loading daily traffic…</span></div></div>
+    </div>
+    <div class="traffic-panel">
+      <h3>Last 30 Days</h3>
+      <div id="trafficBreakdowns" class="loading"><div class="loading-state"><span class="loading-spinner"></span><span>Loading traffic details…</span></div></div>
+    </div>
+  </div>
+  <div id="trafficNote" class="footer-note">Anonymous coach-facing page loads. Admin and local testing are excluded.</div>
+</div>
+
+<div class="section">
   <h2>Performance Summary</h2>
 
   <div class="filters">
@@ -571,10 +682,119 @@ function loadAdminPage(preserveSyncStatus){
   if(!preserveSyncStatus){
     document.getElementById("syncStatus").textContent = "";
   }
+  loadSiteAnalyticsSummary();
   loadPerformanceSummary();
   loadCurrentWeekSchedule();
   loadSubmissionSummary();
   loadMissingSubmissions();
+}
+
+function loadSiteAnalyticsSummary(){
+  document.getElementById("trafficCards").innerHTML = adminLoadingHtml("Loading site traffic…");
+  document.getElementById("trafficDaily").innerHTML = adminLoadingHtml("Loading daily traffic…");
+  document.getElementById("trafficBreakdowns").innerHTML = adminLoadingHtml("Loading traffic details…");
+  const callbackName = "siteAnalyticsSummaryCallback_" + Date.now();
+
+  window[callbackName] = function(data){
+    try{
+      if(data && data.error){
+        renderTrafficError(data.message || "Error loading site traffic.");
+        return;
+      }
+      renderTrafficSummary(data || {});
+    } finally {
+      cleanupJsonp(callbackName);
+    }
+  };
+
+  const script = document.createElement("script");
+  script.id = callbackName;
+  script.src = API + "?siteAnalyticsSummary=1&callback=" + callbackName + "&_=" + Date.now();
+  script.onerror = function(){
+    renderTrafficError("Error loading site traffic.");
+    cleanupJsonp(callbackName);
+  };
+  document.body.appendChild(script);
+}
+
+function renderTrafficSummary(data){
+  const today = data.today || {};
+  const sevenDays = data.sevenDays || {};
+  const thirtyDays = data.thirtyDays || {};
+  const metrics = [
+    ["Today Views", today.views],
+    ["Today Sessions", today.sessions],
+    ["7-Day Views", sevenDays.views],
+    ["7-Day Sessions", sevenDays.sessions],
+    ["30-Day Views", thirtyDays.views],
+    ["30-Day Sessions", thirtyDays.sessions]
+  ];
+
+  document.getElementById("trafficCards").innerHTML = metrics.map(metric => `
+    <div class="card">
+      <div class="card-label">${escapeHtml(metric[0])}</div>
+      <div class="card-value">${escapeHtml(String(Number(metric[1] || 0)))}</div>
+    </div>
+  `).join("");
+
+  const daily = Array.isArray(data.daily) ? data.daily : [];
+  const maxViews = Math.max(1, ...daily.map(item => Number(item.views || 0)));
+  document.getElementById("trafficDaily").innerHTML = daily.length ? `
+    <div class="traffic-chart">
+      ${daily.map(item => {
+        const views = Number(item.views || 0);
+        const width = views ? Math.max(3, Math.round((views / maxViews) * 100)) : 0;
+        return `
+          <div class="traffic-day">
+            <span>${escapeHtml(formatShortTrafficDate(item.date))}</span>
+            <span class="traffic-track" title="${escapeHtml(String(views))} views"><span class="traffic-fill" style="width:${width}%"></span></span>
+            <span class="traffic-day-value">${escapeHtml(String(views))} view${views === 1 ? "" : "s"}</span>
+          </div>
+        `;
+      }).join("")}
+    </div>
+  ` : `<div class="empty">No site visits recorded yet.</div>`;
+
+  document.getElementById("trafficBreakdowns").innerHTML = `
+    <div class="traffic-breakdowns">
+      ${buildTrafficListHtml("Top Pages", data.topPages, item => `${Number(item.views || 0)} views · ${Number(item.sessions || 0)} sessions`)}
+      ${buildTrafficListHtml("Devices", data.devices, item => String(Number(item.count || 0)))}
+      ${buildTrafficListHtml("Browsers", data.browsers, item => String(Number(item.count || 0)))}
+      ${buildTrafficListHtml("Referrers", data.referrers, item => String(Number(item.count || 0)))}
+    </div>
+  `;
+
+  document.getElementById("trafficNote").textContent =
+    `Anonymous coach-facing page loads. Admin and local testing are excluded.${data.generatedAt ? " Updated " + data.generatedAt + "." : ""}`;
+}
+
+function buildTrafficListHtml(title, items, valueFormatter){
+  const rows = Array.isArray(items) ? items : [];
+  return `
+    <div class="traffic-list">
+      <h4>${escapeHtml(title)}</h4>
+      ${rows.length ? rows.map(item => `
+        <div class="traffic-list-row">
+          <span class="traffic-list-label">${escapeHtml(item.label || "Unknown")}</span>
+          <span class="traffic-list-value">${escapeHtml(valueFormatter(item))}</span>
+        </div>
+      `).join("") : `<div class="empty small">No data yet.</div>`}
+    </div>
+  `;
+}
+
+function formatShortTrafficDate(value){
+  const date = new Date(String(value || "") + "T00:00:00");
+  if(isNaN(date.getTime())) return String(value || "");
+  return date.toLocaleDateString(undefined, {month:"numeric", day:"numeric"});
+}
+
+function renderTrafficError(message){
+  const html = `<div class="empty">${escapeHtml(message)}</div>`;
+  document.getElementById("trafficCards").innerHTML = html;
+  document.getElementById("trafficDaily").innerHTML = html;
+  document.getElementById("trafficBreakdowns").innerHTML = html;
+  document.getElementById("trafficNote").textContent = "Anonymous coach-facing page loads. Admin and local testing are excluded.";
 }
 
 function loadPerformanceSummary(){

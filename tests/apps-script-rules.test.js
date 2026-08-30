@@ -92,3 +92,66 @@ test("Apps Script reads drills from the Drills tab",()=>{
   assert.equal(drills[0].title,"Infield EveryDays");
   assert.equal(drills[0].source,"YouTube");
 });
+
+test("Apps Script summarizes anonymous traffic by rolling windows",()=>{
+  const rows = [
+    [new Date(2026,7,30,9),"Pitch Log","/index.html","Direct / unknown","Mobile","Safari","iOS","390x844","390x700","en-US","America/Indiana/Indianapolis","session-a"],
+    [new Date(2026,7,30,10),"Drills","/drills.html","Internal","Mobile","Safari","iOS","390x844","390x700","en-US","America/Indiana/Indianapolis","session-a"],
+    [new Date(2026,7,25,18),"Pitch Log","/index.html","google.com","Desktop","Chrome","Windows","1920x1080","1280x720","en-US","America/Indiana/Indianapolis","session-b"],
+    [new Date(2026,6,30,12),"Pitch Log","/index.html","Direct / unknown","Desktop","Edge","Windows","1920x1080","1280x720","en-US","America/Indiana/Indianapolis","session-c"]
+  ];
+
+  const summary = context.buildSiteAnalyticsSummaryFromRows_(rows,new Date(2026,7,30,20));
+  assert.deepEqual(JSON.parse(JSON.stringify(summary.today)),{views:2,sessions:1});
+  assert.deepEqual(JSON.parse(JSON.stringify(summary.sevenDays)),{views:3,sessions:2});
+  assert.deepEqual(JSON.parse(JSON.stringify(summary.thirtyDays)),{views:3,sessions:2});
+  assert.deepEqual(JSON.parse(JSON.stringify(summary.allTime)),{views:4,sessions:3});
+  assert.equal(summary.topPages[0].label,"Pitch Log");
+  assert.equal(summary.topPages[0].views,2);
+  assert.equal(summary.daily.length,14);
+  assert.deepEqual(JSON.parse(JSON.stringify(summary.daily[13])),{date:"2026-08-30",views:2,sessions:1});
+});
+
+test("Apps Script appends a sanitized site visit row",()=>{
+  let appended;
+  context.LockService = {
+    getScriptLock(){
+      return {waitLock(ms){ assert.equal(ms,5000); },releaseLock(){}};
+    }
+  };
+  context.SpreadsheetApp = {
+    getActiveSpreadsheet(){
+      return {
+        getSheetByName(name){
+          assert.equal(name,"Site_Visits");
+          return {
+            getLastRow(){ return 1; },
+            getRange(row,column,rowCount,columnCount){
+              assert.deepEqual([row,column,rowCount,columnCount],[2,1,1,12]);
+              return {setValues(values){ appended = values[0]; }};
+            }
+          };
+        }
+      };
+    }
+  };
+
+  context.recordSiteVisit_({
+    page:"P".repeat(100),
+    path:"/index.html",
+    referrer:"Direct / unknown",
+    device:"Mobile",
+    browser:"Safari",
+    operatingSystem:"iOS",
+    screen:"390x844",
+    viewport:"390x700",
+    language:"en-US",
+    timezone:"America/Indiana/Indianapolis",
+    sessionId:"session-test"
+  });
+
+  assert.equal(appended.length,12);
+  assert.equal(appended[1].length,80);
+  assert.equal(appended[4],"Mobile");
+  assert.equal(appended[11],"session-test");
+});

@@ -11,6 +11,7 @@ const port = Number(process.env.NYB_DEV_PORT || 8787);
 const host = "127.0.0.1";
 const submissions = new Map();
 const history = [];
+const siteVisits = [];
 let lastSynced = new Date();
 
 function localDate(offsetDays = 0){
@@ -103,10 +104,40 @@ function overallLevel(pitchers){
   return "clear";
 }
 
+function mockTrafficSummary(){
+  const dailyViews = [2,4,3,6,5,0,8,4,7,9,3,6,11,8];
+  const daily = dailyViews.map((views,index)=>({
+    date:localDate(index - 13),
+    views,
+    sessions:Math.max(0,Math.ceil(views * .7))
+  }));
+  return {
+    generatedAt:new Date().toLocaleString(),
+    today:{views:8,sessions:6},
+    sevenDays:{views:48,sessions:31},
+    thirtyDays:{views:126,sessions:74},
+    allTime:{views:126,sessions:74},
+    topPages:[
+      {label:"Pitch Log",views:79,sessions:51},
+      {label:"Drills",views:29,sessions:18},
+      {label:"Fall Practice",views:18,sessions:13}
+    ],
+    devices:[{label:"Mobile",count:88},{label:"Desktop",count:31},{label:"Tablet",count:7}],
+    browsers:[{label:"Safari",count:72},{label:"Chrome",count:45},{label:"Edge",count:9}],
+    referrers:[{label:"Direct / unknown",count:94},{label:"Internal",count:25},{label:"groupme.com",count:7}],
+    daily
+  };
+}
+
 async function handleApi(req,res,url){
   if(req.method === "POST"){
     try{
       const data = JSON.parse(await readBody(req));
+      if(data.eventType === "site_visit"){
+        siteVisits.push(Object.assign({timestamp:new Date().toISOString()},data));
+        sendJson(res,{result:"success"});
+        return;
+      }
       if(data.submissionId && submissions.has(data.submissionId)){
         sendJson(res, submissions.get(data.submissionId));
         return;
@@ -147,7 +178,9 @@ async function handleApi(req,res,url){
 
   const callback = url.searchParams.get("callback") || "callback";
   let value = {};
-  if(url.searchParams.has("drills")){
+  if(url.searchParams.has("siteAnalyticsSummary")){
+    value = mockTrafficSummary();
+  }else if(url.searchParams.has("drills")){
     value = JSON.parse(fs.readFileSync(path.join(root,"drills.json"),"utf8"));
   }else if(url.searchParams.has("gcGameCards")){
     const team = url.searchParams.get("teamName") || "";

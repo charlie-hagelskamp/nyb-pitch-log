@@ -22,6 +22,21 @@ function doGet(e) {
   const callback = params.callback || "dashboardCallback";
 
   // =========================
+  // Anonymous site traffic summary
+  // ?siteAnalyticsSummary=1&callback=...
+  // =========================
+  if (params.siteAnalyticsSummary) {
+    try {
+      return outputJsonp(callback, buildSiteAnalyticsSummary_());
+    } catch (err) {
+      return outputJsonp(callback, {
+        error: true,
+        message: err.message || String(err)
+      });
+    }
+  }
+
+  // =========================
   // Performance summary endpoint
   // ?performanceSummary=1&includeFall=1&callback=...
   // =========================
@@ -435,11 +450,17 @@ function doGet(e) {
 }
 
 function doPost(e) {
+  const data = JSON.parse(e.postData.contents);
+
+  if (data.eventType === "site_visit") {
+    recordSiteVisit_(data);
+    return jsonOutput({ result: "success" });
+  }
+
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
 
   try {
-    const data = JSON.parse(e.postData.contents);
     const submissionId = String(data.submissionId || Utilities.getUuid()).trim();
     const existing = getSubmissionResult_(submissionId);
     if (existing) return jsonOutput(existing);
@@ -851,6 +872,150 @@ function jsonOutput(obj) {
   return ContentService
     .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+function recordSiteVisit_(data) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(5000);
+
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Site_Visits");
+    if (!sheet) throw new Error("Missing Site_Visits sheet");
+
+    sheet.getRange(sheet.getLastRow() + 1, 1, 1, 12).setValues([[
+      new Date(),
+      safeAnalyticsText_(data.page, 80),
+      safeAnalyticsText_(data.path, 200),
+      safeAnalyticsText_(data.referrer, 200),
+      safeAnalyticsText_(data.device, 30),
+      safeAnalyticsText_(data.browser, 40),
+      safeAnalyticsText_(data.operatingSystem, 40),
+      safeAnalyticsText_(data.screen, 30),
+      safeAnalyticsText_(data.viewport, 30),
+      safeAnalyticsText_(data.language, 20),
+      safeAnalyticsText_(data.timezone, 80),
+      safeAnalyticsText_(data.sessionId, 80)
+    ]]);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function safeAnalyticsText_(value, maxLength) {
+  return String(value == null ? "" : value).trim().slice(0, maxLength);
+}
+
+function buildSiteAnalyticsSummary_() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Site_Visits");
+  const rows = !sheet || sheet.getLastRow() < 2
+    ? []
+    : sheet.getRange(2, 1, sheet.getLastRow() - 1, 12).getValues();
+  return buildSiteAnalyticsSummaryFromRows_(rows, new Date());
+}
+
+function buildSiteAnalyticsSummaryFromRows_(rows, now) {
+  const todayKey = analyticsDateKey_(now);
+  const sevenDayStart = analyticsDateKey_(analyticsDaysAgo_(now, 6));
+  const thirtyDayStart = analyticsDateKey_(analyticsDaysAgo_(now, 29));
+  const fourteenDayStart = analyticsDateKey_(analyticsDaysAgo_(now, 13));
+  const records = [];
+
+  (rows || []).forEach((row, index) => {
+    const timestamp = row[0] instanceof Date ? new Date(row[0].getTime()) : new Date(row[0]);
+    if (isNaN(timestamp.getTime())) return;
+    const date = analyticsDateKey_(timestamp);
+    records.push({
+      date: date,
+      page: safeAnalyticsText_(row[1], 80) || "Unknown page",
+      referrer: safeAnalyticsText_(row[3], 200) || "Direct / unknown",
+      device: safeAnalyticsText_(row[4], 30) || "Unknown",
+      browser: safeAnalyticsText_(row[5], 40) || "Unknown",
+      sessionId: safeAnalyticsText_(row[11], 80) || "row-" + index
+    });
+  });
+
+  const today = records.filter(record => record.date === todayKey);
+  const sevenDays = records.filter(record => record.date >= sevenDayStart && record.date <= todayKey);
+  const thirtyDays = records.filter(record => record.date >= thirtyDayStart && record.date <= todayKey);
+  const dailyRecords = records.filter(record => record.date >= fourteenDayStart && record.date <= todayKey);
+
+  return {
+    generatedAt: formatDateTime(now),
+    today: analyticsWindowStats_(today),
+    sevenDays: analyticsWindowStats_(sevenDays),
+    thirtyDays: analyticsWindowStats_(thirtyDays),
+    allTime: analyticsWindowStats_(records),
+    topPages: analyticsGroupedCounts_(thirtyDays, "page", true).slice(0, 5),
+    devices: analyticsGroupedCounts_(thirtyDays, "device", false).slice(0, 5),
+    browsers: analyticsGroupedCounts_(thirtyDays, "browser", false).slice(0, 5),
+    referrers: analyticsGroupedCounts_(thirtyDays, "referrer", false).slice(0, 5),
+    daily: analyticsDailySeries_(dailyRecords, now)
+  };
+}
+
+function analyticsDateKey_(date) {
+  return Utilities.formatDate(date, Session.getScriptTimeZone(), "yyyy-MM-dd");
+}
+
+function analyticsDaysAgo_(date, days) {
+  const result = new Date(date.getTime());
+  result.setHours(12, 0, 0, 0);
+  result.setDate(result.getDate() - days);
+  return result;
+}
+
+function analyticsWindowStats_(records) {
+  const sessions = new Set();
+  records.forEach(record => { sessions.add(record.sessionId); });
+  return { views: records.length, sessions: sessions.size };
+}
+
+function analyticsGroupedCounts_(records, field, includeSessions) {
+  const groups = Object.create(null);
+
+  records.forEach(record => {
+    const label = record[field] || "Unknown";
+    if (!groups[label]) groups[label] = { label: label, count: 0, sessions: new Set() };
+    groups[label].count += 1;
+    groups[label].sessions.add(record.sessionId);
+  });
+
+  return Object.keys(groups).map(label => {
+    const group = groups[label];
+    if (includeSessions) {
+      return {
+        label: group.label,
+        views: group.count,
+        sessions: group.sessions.size
+      };
+    }
+    return { label: group.label, count: group.count };
+  }).sort((a, b) => {
+    const aCount = includeSessions ? a.views : a.count;
+    const bCount = includeSessions ? b.views : b.count;
+    return bCount - aCount || String(a.label).localeCompare(String(b.label));
+  });
+}
+
+function analyticsDailySeries_(records, now) {
+  const grouped = Object.create(null);
+  records.forEach(record => {
+    if (!grouped[record.date]) grouped[record.date] = { views: 0, sessions: new Set() };
+    grouped[record.date].views += 1;
+    grouped[record.date].sessions.add(record.sessionId);
+  });
+
+  const series = [];
+  for (let offset = 13; offset >= 0; offset--) {
+    const date = analyticsDateKey_(analyticsDaysAgo_(now, offset));
+    const item = grouped[date] || { views: 0, sessions: new Set() };
+    series.push({
+      date: date,
+      views: item.views,
+      sessions: item.sessions.size
+    });
+  }
+  return series;
 }
 
 function parseLocalDate(yyyyMmDd) {
