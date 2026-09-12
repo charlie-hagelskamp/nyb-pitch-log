@@ -155,3 +155,42 @@ test("Apps Script appends a sanitized site visit row",()=>{
   assert.equal(appended[4],"Mobile");
   assert.equal(appended[11],"session-test");
 });
+
+test("Apps Script joins one team's notes to GameChanger results by game ID",()=>{
+  const gcHeaders = ["Team","GC_Team_ID","GC_Game_ID","Date","Start_Time","Opponent","Game_Status","Team_Score","Opponent_Score","Result","Sync_Time"];
+  const gameHeaders = ["GameID","Date","Team","Opponent","Notes","SubmissionTime","SubmissionID","GC_Game_ID","GameStartTime","GameSequence","ScheduleMatched","ScheduleLastSynced","SubmittedBy"];
+  const gcRows = [
+    ["12U Gold","team-12","game-1","2026-09-12","12:00 PM","Indiana Hype","completed",10,14,"L 10-14",new Date(2026,8,12,18)],
+    ["12U Gold","team-12","game-2","2026-09-12","2:00 PM","Marucci Prospects","completed",7,5,"W 7-5",new Date(2026,8,12,18)],
+    ["11U Black","team-11","game-3","2026-09-12","4:00 PM","Other Team","completed",3,2,"W 3-2",new Date(2026,8,12,18)]
+  ];
+  const gameRows = [
+    [100,"2026-09-12","12U Gold","Marucci Prospects","Great late-game approach.",new Date(2026,8,12,17),"submission-1","game-2","2:00 PM",2,true,"","Coach"]
+  ];
+
+  const built = context.buildGameReviewFromRows_(gcRows,gcHeaders,gameRows,gameHeaders,{team:"12U Gold",endDate:"2026-09-12"});
+  assert.equal(built.games.length,2);
+  assert.equal(built.games[0].gcGameId,"game-2");
+  assert.equal(built.games[0].notes,"Great late-game approach.");
+  assert.equal(built.games[0].result,"W 7-5");
+  assert.equal(built.games[1].notesMissing,true);
+
+  const summary = context.summarizeReviewGames_(built.games);
+  assert.deepEqual(JSON.parse(JSON.stringify(summary)),{
+    wins:1,losses:1,ties:0,runsScored:17,runsAllowed:19,completedGames:2,missingNotes:1
+  });
+});
+
+test("weekly email uses the app logo and shared game-note data",()=>{
+  const games = [
+    {team:"12U Gold",date:"2026-09-12",startTime:"2:00 PM",opponent:"Marucci Prospects",gameStatus:"completed",teamScore:7,opponentScore:5,result:"W 7-5",notes:"Great late-game approach.",hasNotes:true,notesMissing:false,matchStatus:"matched"}
+  ];
+  const report = context.buildWeeklyReportFromGames_(games,"2026-09-07","2026-09-13","2026-09-12 20:00:00");
+  const html = context.buildWeeklyReportEmailHtml_(report,context.APP_LOGO_URL);
+  assert.equal(report.summary.wins,1);
+  assert.equal(report.summary.runsScored,7);
+  assert.match(html,/nyb-logo\.png/);
+  assert.match(html,/W 7-5/);
+  assert.match(html,/Great late-game approach\./);
+  assert.match(html,/12U Gold/);
+});

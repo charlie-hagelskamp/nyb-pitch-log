@@ -129,6 +129,40 @@ function mockTrafficSummary(){
   };
 }
 
+function mockTeamNotes(team){
+  const games = mockGames().filter(game=>game.team === team && game.gameStatus === "completed").map((game,index)=>
+    Object.assign({},game,{
+      notes:index === 0 ? "Strong pitching and good situational hitting. Defense stayed composed late." : "",
+      hasNotes:index === 0,
+      notesMissing:index !== 0,
+      hasSubmission:index === 0,
+      matchStatus:index === 0 ? "matched" : "gamechanger_only",
+      submissionTime:index === 0 ? new Date().toLocaleString() : ""
+    })
+  );
+  return {
+    team,
+    startDate:"",
+    endDate:localDate(),
+    lastSynced:lastSynced.toLocaleString(),
+    summary:{wins:1,losses:1,ties:0,completedGames:2,runsScored:10,runsAllowed:9,missingNotes:1},
+    games
+  };
+}
+
+function mockWeeklyReportPreview(){
+  return {
+    recipientCount:0,
+    automationInstalled:true,
+    report:{startDate:localDate(-5),endDate:localDate(1)},
+    html:`<div style="margin:0;padding:22px 10px;background:#f4f1ea;font-family:Arial;color:#171717;"><div style="max-width:680px;margin:auto;"><div style="background:#050505;border-radius:10px;padding:18px;text-align:center;"><img src="nyb-logo.png" width="82" height="82" style="border-radius:50%;border:2px solid #b8a05c;"><div style="color:#c8b46c;font-size:12px;font-weight:bold;margin-top:8px;">NOBLESVILLE TRAVEL BASEBALL</div><div style="color:#fff;font-size:24px;font-weight:bold;margin-top:5px;">Weekly Game Report</div><div style="color:#ddd5c0;margin-top:5px;">Monday–Sunday</div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;"><div style="background:#fff;border:1px solid #ddd2ba;border-radius:8px;padding:13px;text-align:center;"><small>RECORD</small><div style="font-size:24px;font-weight:bold;">5-3</div></div><div style="background:#fff;border:1px solid #ddd2ba;border-radius:8px;padding:13px;text-align:center;"><small>COMPLETED GAMES</small><div style="font-size:24px;font-weight:bold;">8</div></div></div><div style="background:#171717;color:#fff;border-radius:8px 8px 0 0;padding:12px 14px;margin-top:18px;font-size:18px;font-weight:bold;">${teamSafeHtml("11U Black")}</div><div style="background:#fff;border:1px solid #ddd2ba;padding:14px;">W 7-4 vs Brownsburg Bulldogs<br><div style="margin-top:8px;color:#444;">Strong pitching and good situational hitting.</div></div></div></div>`
+  };
+}
+
+function teamSafeHtml(value){
+  return String(value).replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));
+}
+
 async function handleApi(req,res,url){
   if(req.method === "POST"){
     try{
@@ -178,7 +212,9 @@ async function handleApi(req,res,url){
 
   const callback = url.searchParams.get("callback") || "callback";
   let value = {};
-  if(url.searchParams.has("siteAnalyticsSummary")){
+  if(url.searchParams.has("weeklyReportPreview")){
+    value = mockWeeklyReportPreview();
+  }else if(url.searchParams.has("siteAnalyticsSummary")){
     value = mockTrafficSummary();
   }else if(url.searchParams.has("drills")){
     value = JSON.parse(fs.readFileSync(path.join(root,"drills.json"),"utf8"));
@@ -219,7 +255,7 @@ async function handleApi(req,res,url){
   }else if(url.searchParams.has("team")){
     value = [];
   }else if(url.searchParams.has("notesTeam")){
-    value = [];
+    value = mockTeamNotes(url.searchParams.get("notesTeam") || "");
   }
   sendJsonp(res,callback,value);
 }

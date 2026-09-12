@@ -217,6 +217,38 @@ th{
   cursor:progress;
 }
 
+.weekly-report-actions{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  flex-wrap:wrap;
+}
+
+.weekly-sheet-link{
+  color:#70591d;
+  font-weight:bold;
+  font-size:13px;
+}
+
+.weekly-preview{
+  display:none;
+  margin-top:16px;
+  border:1px solid #dfd5bd;
+  border-radius:8px;
+  overflow:hidden;
+  background:#f4f1ea;
+}
+
+.weekly-preview.visible{
+  display:block;
+}
+
+.weekly-preview-status{
+  margin-top:10px;
+  font-size:13px;
+  color:#554b35;
+}
+
 .traffic-cards{
   grid-template-columns:repeat(3, minmax(0,1fr));
   margin-bottom:16px;
@@ -602,6 +634,17 @@ th{
 </div>
 
 <div class="section">
+  <h2>Weekly Email Report</h2>
+  <p class="sync-panel-copy">A Monday–Sunday organization report will send during the first Sunday automation check after 8:00 PM Eastern when at least one recipient is active.</p>
+  <div class="weekly-report-actions">
+    <button id="weeklyPreviewBtn" class="sync-btn" onclick="loadWeeklyReportPreview()">Preview This Week</button>
+    <a class="weekly-sheet-link" href="https://docs.google.com/spreadsheets/d/1I52gbuegk6fYZOVo0lPjoJHCiVIqdBXUggz3oq3Twxc/edit#gid=840546098" target="_blank" rel="noopener">Manage Recipients</a>
+  </div>
+  <div id="weeklyPreviewStatus" class="weekly-preview-status">Recipient delivery is inactive until an address is checked Active in the spreadsheet.</div>
+  <div id="weeklyReportPreview" class="weekly-preview"></div>
+</div>
+
+<div class="section">
   <h2>Performance Summary</h2>
 
   <div class="filters">
@@ -687,6 +730,49 @@ function loadAdminPage(preserveSyncStatus){
   loadCurrentWeekSchedule();
   loadSubmissionSummary();
   loadMissingSubmissions();
+}
+
+function loadWeeklyReportPreview(){
+  const button = document.getElementById("weeklyPreviewBtn");
+  const preview = document.getElementById("weeklyReportPreview");
+  const status = document.getElementById("weeklyPreviewStatus");
+  const callbackName = "weeklyReportPreviewCallback_" + Date.now();
+  button.disabled = true;
+  preview.classList.add("visible");
+  preview.innerHTML = adminLoadingHtml("Building weekly email preview…");
+  status.textContent = "Building from the latest GameChanger sync and submitted notes…";
+
+  window[callbackName] = function(data){
+    try{
+      if(data && data.error){
+        preview.innerHTML = `<div class="empty" style="padding:16px;">${escapeHtml(data.message || "Unable to build the weekly preview.")}</div>`;
+        status.textContent = "Preview unavailable.";
+        return;
+      }
+      preview.innerHTML = data && data.html ? data.html : `<div class="empty" style="padding:16px;">No preview returned.</div>`;
+      const count = Number((data && data.recipientCount) || 0);
+      const installed = !!(data && data.automationInstalled);
+      status.textContent = count && installed
+        ? `${count} active recipient${count === 1 ? "" : "s"}. Automatic Sunday delivery is enabled.`
+        : count
+          ? `${count} active recipient${count === 1 ? "" : "s"}; the automation trigger still needs to be installed.`
+          : "No active recipients. Preview only; automatic delivery remains inactive.";
+    } finally {
+      button.disabled = false;
+      cleanupJsonp(callbackName);
+    }
+  };
+
+  const script = document.createElement("script");
+  script.id = callbackName;
+  script.src = API + "?weeklyReportPreview=1&callback=" + callbackName + "&_=" + Date.now();
+  script.onerror = function(){
+    preview.innerHTML = `<div class="empty" style="padding:16px;">Unable to load the weekly preview.</div>`;
+    status.textContent = "Preview unavailable.";
+    button.disabled = false;
+    cleanupJsonp(callbackName);
+  };
+  document.body.appendChild(script);
 }
 
 function loadSiteAnalyticsSummary(){

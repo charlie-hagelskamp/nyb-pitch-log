@@ -256,6 +256,92 @@ button:disabled{
   margin-top:10px;
 }
 
+.notes-card.notes-missing{
+  border-color:#d39a27;
+  border-left-width:6px;
+  background:#fffaf0;
+}
+
+.notes-card-top{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:14px;
+}
+
+.notes-score{
+  flex:0 0 auto;
+  text-align:right;
+  font-size:22px;
+  font-weight:bold;
+}
+
+.notes-score.win{color:#16794b;}
+.notes-score.loss{color:#b42318;}
+.notes-score.other{color:#665d49;}
+
+.notes-status{
+  margin-top:3px;
+  color:#665d49;
+  font-size:11px;
+  font-weight:bold;
+  text-transform:uppercase;
+}
+
+.notes-summary-grid{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:8px;
+  margin:14px 0;
+}
+
+.notes-summary-card{
+  border:1px solid #dfd5bd;
+  border-radius:6px;
+  background:#faf7ef;
+  padding:10px;
+  text-align:center;
+}
+
+.notes-summary-label{
+  color:#665d49;
+  font-size:11px;
+  text-transform:uppercase;
+}
+
+.notes-summary-value{
+  font-size:21px;
+  font-weight:bold;
+  margin-top:3px;
+}
+
+.notes-review-meta{
+  color:#665d49;
+  font-size:12px;
+  margin-top:5px;
+}
+
+.notes-chip{
+  display:inline-block;
+  margin-top:7px;
+  border-radius:999px;
+  padding:4px 8px;
+  background:#eee7d7;
+  color:#554b35;
+  font-size:11px;
+  font-weight:bold;
+}
+
+.notes-chip.warning{
+  background:#fff0c7;
+  color:#7a4c00;
+}
+
+.notes-card-text.missing{
+  color:#7a4c00;
+  font-weight:bold;
+}
+
 .notes-card-date{
   font-weight:bold;
   margin-bottom:6px;
@@ -269,6 +355,9 @@ button:disabled{
 .notes-card-text{
   white-space:pre-wrap;
   line-height:1.4;
+  border-top:1px solid #eee7d7;
+  margin-top:10px;
+  padding-top:10px;
 }
 
 .empty-message{
@@ -605,6 +694,14 @@ button:disabled{
   .dashboard-table th,
   .dashboard-table td{
     padding:6px;
+  }
+
+  .notes-summary-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+
+  .notes-card-top{
+    gap:8px;
   }
 
   .header{
@@ -1501,7 +1598,7 @@ function showDashboard(){
   sel.onchange = ()=>loadTeamStatus(sel.value);
 }
 
-function showGameNotesLogs(){
+function showGameNotesLogs(initialTeam){
   document.getElementById("form-section").style.display = "none";
   document.getElementById("summary").style.display = "none";
   document.getElementById("dashboard").style.display = "none";
@@ -1512,10 +1609,10 @@ function showGameNotesLogs(){
   notesView.innerHTML = `
     <button onclick="backToForm()">⬅ Back to Game Submission</button>
 
-    <h3>Game Notes Logs</h3>
+    <h3>Game Notes</h3>
 
-    Select Team<br>
-    <select id="notesTeam">
+    <label for="notesTeam"><strong>Select Team</strong></label><br>
+    <select id="notesTeam" style="width:100%;max-width:420px;">
       <option value="">Select a team</option>
     </select>
 
@@ -1531,7 +1628,20 @@ function showGameNotesLogs(){
     sel.appendChild(o);
   });
 
-  sel.onchange = ()=>loadGameNotesLogs(sel.value);
+  sel.onchange = ()=>{
+    const url = new URL(location.href);
+    url.searchParams.set("view", "notes");
+    if(sel.value) url.searchParams.set("team", sel.value);
+    else url.searchParams.delete("team");
+    history.replaceState({}, "", url);
+    if(sel.value) loadGameNotesLogs(sel.value);
+    else document.getElementById("notesResults").innerHTML = "";
+  };
+
+  if(initialTeam && Object.prototype.hasOwnProperty.call(roster, initialTeam)){
+    sel.value = initialTeam;
+    loadGameNotesLogs(initialTeam);
+  }
 }
 
 function backToForm(){
@@ -1539,6 +1649,10 @@ function backToForm(){
   document.getElementById("gameNotesLogs").style.display = "none";
   document.getElementById("form-section").style.display = "block";
   document.getElementById("summary").style.display = "block";
+  const url = new URL(location.href);
+  url.searchParams.delete("view");
+  url.searchParams.delete("team");
+  history.replaceState({}, "", url);
 }
 
 function formatDayAndDate(yyyyMmDd){
@@ -1664,21 +1778,62 @@ function loadGameNotesLogs(team){
   window[callbackName] = function(data){
     try{
       const target = document.getElementById("notesResults");
-
-      if(!Array.isArray(data) || data.length === 0){
-        target.innerHTML = `<div class="empty-message">No game notes found for this team.</div>`;
-        cleanupJsonp(callbackName);
+      if(data && data.error){
+        target.innerHTML = `<div class="status-bad">${escapeHtml(data.message || "Unable to load game notes.")}</div>`;
         return;
       }
 
-      let html = "";
+      const payload = Array.isArray(data) ? {team:team,games:data,summary:{}} : (data || {});
+      const games = Array.isArray(payload.games) ? payload.games : [];
 
-      data.forEach(item=>{
+      if(games.length === 0){
+        target.innerHTML = `<div class="empty-message">No game notes found for this team.</div>`;
+        return;
+      }
+
+      const summary = payload.summary || {};
+      const record = Number(summary.wins || 0) + "-" + Number(summary.losses || 0) +
+        (Number(summary.ties || 0) ? "-" + Number(summary.ties || 0) : "");
+      let html = `
+        <div class="notes-review-heading">
+          <h3 style="margin-bottom:0;">${escapeHtml(payload.team || team)}</h3>
+          <div class="notes-review-meta">GameChanger results with submitted game notes${payload.lastSynced ? " • Synced " + escapeHtml(payload.lastSynced) : ""}</div>
+        </div>
+        <div class="notes-summary-grid">
+          ${notesSummaryCard("Record", record)}
+          ${notesSummaryCard("Completed", Number(summary.completedGames || 0))}
+          ${notesSummaryCard("Runs Scored", Number(summary.runsScored || 0))}
+          ${notesSummaryCard("Runs Allowed", Number(summary.runsAllowed || 0))}
+        </div>`;
+
+      games.forEach(item=>{
+        const result = String(item.result || "");
+        const scoreText = item.teamScore !== "" && item.opponentScore !== ""
+          ? `${escapeHtml(String(item.teamScore))}-${escapeHtml(String(item.opponentScore))}`
+          : escapeHtml(result || titleCase(item.gameStatus || "Score pending"));
+        const scoreClass = result.startsWith("W ") ? "win" : result.startsWith("L ") ? "loss" : "other";
+        const noteText = item.notes
+          ? escapeHtml(item.notes)
+          : item.notesMissing ? "Game notes have not been submitted." : "No notes recorded.";
+        const badge = item.notesMissing
+          ? `<span class="notes-chip warning">Notes missing</span>`
+          : item.matchStatus === "manual" ? `<span class="notes-chip">Manual entry</span>`
+          : item.matchStatus === "gamechanger_unavailable" ? `<span class="notes-chip">GameChanger result unavailable</span>`
+          : "";
         html += `
-          <div class="notes-card">
-            <div class="notes-card-date">${formatDayAndDate(item.date)}</div>
-            <div class="notes-card-opp"><strong>Opponent:</strong> ${escapeHtml(item.opponent || "")}</div>
-            <div class="notes-card-text">${escapeHtml(item.notes || "")}</div>
+          <div class="notes-card ${item.notesMissing ? "notes-missing" : ""}">
+            <div class="notes-card-top">
+              <div>
+                <div class="notes-card-date">${formatDayAndDate(item.date)}${item.startTime ? " • " + escapeHtml(item.startTime) : ""}</div>
+                <div class="notes-card-opp"><strong>Opponent:</strong> ${escapeHtml(item.opponent || "Opponent unavailable")}</div>
+                ${badge}
+              </div>
+              <div>
+                <div class="notes-score ${scoreClass}">${scoreText}</div>
+                <div class="notes-status">${escapeHtml(result || item.gameStatus || "")}</div>
+              </div>
+            </div>
+            <div class="notes-card-text ${item.notesMissing ? "missing" : ""}">${noteText}</div>
           </div>
         `;
       });
@@ -1701,6 +1856,15 @@ function loadGameNotesLogs(team){
   document.body.appendChild(script);
 }
 
+function notesSummaryCard(label, value){
+  return `<div class="notes-summary-card"><div class="notes-summary-label">${escapeHtml(label)}</div><div class="notes-summary-value">${escapeHtml(String(value))}</div></div>`;
+}
+
+function titleCase(value){
+  const text = String(value || "").trim();
+  return text ? text.charAt(0).toUpperCase() + text.slice(1).toLowerCase() : "";
+}
+
 function cleanupJsonp(callbackName){
   const script = document.getElementById(callbackName);
   if(script) script.remove();
@@ -1720,7 +1884,10 @@ function escapeSingleQuotes(str){
   return String(str).replaceAll("'","\\'");
 }
 
-load();
+load().then(()=>{
+  const params = new URLSearchParams(location.search);
+  if(params.get("view") === "notes") showGameNotesLogs(params.get("team") || "");
+});
 </script>
 
 <script src="site-analytics.js" defer></script>

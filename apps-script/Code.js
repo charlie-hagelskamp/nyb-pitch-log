@@ -15,6 +15,11 @@ const MISSING_OVERRIDE_TYPE = "Ignore Missing";
 const FALL_PRACTICE_SOURCE_ID = "1KpbgC-0iugmxSMpjsXFx1nPUyPRrW32QHp6Bd_G41eU";
 const FALL_PRACTICE_SOURCE_TAB = "Master";
 const FALL_PRACTICE_TEAMS = ["7B", "8B", "8G", "10B", "10G", "11B", "11G", "12G"];
+const APP_BASE_URL = "https://charlie-hagelskamp.github.io/nyb-pitch-log";
+const APP_LOGO_URL = APP_BASE_URL + "/nyb-logo.png";
+const WEEKLY_REPORT_TIMEZONE = "America/New_York";
+const WEEKLY_RECIPIENTS_SHEET = "Weekly_Email_Recipients";
+const WEEKLY_REPORT_LOG_SHEET = "Weekly_Report_Log";
 
 function doGet(e) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -44,6 +49,30 @@ function doGet(e) {
     try {
       const includeFall = isTruthy_(params.includeFall);
       return outputJsonp(callback, buildPerformanceSummary_(includeFall));
+    } catch (err) {
+      return outputJsonp(callback, {
+        error: true,
+        message: err.message || String(err)
+      });
+    }
+  }
+
+  // =========================
+  // Read-only weekly email preview
+  // ?weeklyReportPreview=1&callback=...
+  // =========================
+  if (params.weeklyReportPreview) {
+    try {
+      const referenceDate = params.weekStart
+        ? parseLocalDate(String(params.weekStart))
+        : new Date();
+      const report = buildWeeklyReportData_(referenceDate);
+      return outputJsonp(callback, {
+        report: report,
+        recipientCount: getActiveWeeklyRecipients_().length,
+        automationInstalled: isSmartSyncTriggerInstalled_(),
+        html: buildWeeklyReportEmailHtml_(report, APP_LOGO_URL)
+      });
     } catch (err) {
       return outputJsonp(callback, {
         error: true,
@@ -196,36 +225,18 @@ function doGet(e) {
   // ?notesTeam=8U%20Black&callback=...
   // =========================
   if (params.notesTeam) {
-    const gamesSheet = ss.getSheetByName("Games");
-
-    if (!gamesSheet) {
-      return outputJsonp(callback, []);
+    try {
+      return outputJsonp(callback, buildTeamGameNotesReview_(
+        String(params.notesTeam || "").trim(),
+        String(params.startDate || "").trim(),
+        String(params.endDate || formatDateOnly(new Date())).trim()
+      ));
+    } catch (err) {
+      return outputJsonp(callback, {
+        error: true,
+        message: err.message || String(err)
+      });
     }
-
-    const team = params.notesTeam;
-    const rows = gamesSheet.getDataRange().getValues();
-
-    if (rows.length <= 1) {
-      return outputJsonp(callback, []);
-    }
-
-    const headers = rows.shift();
-
-    const dateCol = headers.indexOf("Date");
-    const teamCol = headers.indexOf("Team");
-    const opponentCol = headers.indexOf("Opponent");
-    const notesCol = headers.indexOf("Notes");
-
-    const results = rows
-      .filter(r => r[teamCol] === team)
-      .map(r => ({
-        date: normalizeDateString(r[dateCol]),
-        opponent: r[opponentCol] || "",
-        notes: r[notesCol] || ""
-      }))
-      .sort((a, b) => String(b.date).localeCompare(String(a.date)));
-
-    return outputJsonp(callback, results);
   }
 
   // =========================
@@ -1060,6 +1071,219 @@ function isTruthy_(value) {
 }
 
 /* =========================
+   GAME RESULTS + NOTES REVIEW
+========================= */
+
+function buildTeamGameNotesReview_(team, startDate, endDate) {
+  if (!team) throw new Error("Team is required");
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const gcSheet = ss.getSheetByName("GC_Games_Sync");
+  const gamesSheet = ss.getSheetByName("Games");
+  if (!gcSheet || !gamesSheet) throw new Error("Missing GC_Games_Sync or Games sheet");
+
+  const gcValues = gcSheet.getDataRange().getValues();
+  const gameValues = gamesSheet.getDataRange().getValues();
+  const gcHeaders = gcValues.length ? gcValues.shift() : [];
+  const gameHeaders = gameValues.length ? gameValues.shift() : [];
+  const built = buildGameReviewFromRows_(gcValues, gcHeaders, gameValues, gameHeaders, {
+    team: team,
+    startDate: startDate,
+    endDate: endDate
+  });
+
+  return {
+    team: team,
+    startDate: startDate || "",
+    endDate: endDate || "",
+    summary: summarizeReviewGames_(built.games),
+    games: built.games,
+    lastSynced: built.lastSynced
+  };
+}
+
+function buildGameReviewFromRows_(gcRows, gcHeaders, gameRows, gameHeaders, options) {
+  const filters = options || {};
+  const gcCol = name => gcHeaders.indexOf(name);
+  const gameCol = name => gameHeaders.indexOf(name);
+  const submissionsByGcId = Object.create(null);
+  const submissions = [];
+
+  (gameRows || []).forEach((row, index) => {
+    const team = String(row[gameCol("Team")] || "").trim();
+    const date = normalizeDateStringGC_(row[gameCol("Date")]);
+    if (!team || !date) return;
+    const item = {
+      rowIndex: index,
+      team: team,
+      date: date,
+      opponent: row[gameCol("Opponent")] || "",
+      notes: String(row[gameCol("Notes")] || "").trim(),
+      gcGameId: String(row[gameCol("GC_Game_ID")] || "").trim(),
+      startTime: formatTimeForDisplayGC_(row[gameCol("GameStartTime")]),
+      submittedBy: row[gameCol("SubmittedBy")] || "",
+      submissionTime: row[gameCol("SubmissionTime")]
+    };
+    submissions.push(item);
+
+    if (item.gcGameId) {
+      const existing = submissionsByGcId[item.gcGameId];
+      const existingTime = existing && existing.submissionTime ? new Date(existing.submissionTime).getTime() : 0;
+      const itemTime = item.submissionTime ? new Date(item.submissionTime).getTime() : 0;
+      if (!existing || itemTime >= existingTime) submissionsByGcId[item.gcGameId] = item;
+    }
+  });
+
+  const games = [];
+  const usedSubmissionRows = Object.create(null);
+  let latestSync = null;
+
+  (gcRows || []).forEach(row => {
+    const team = String(row[gcCol("Team")] || "").trim();
+    const date = normalizeDateStringGC_(row[gcCol("Date")]);
+    if (!gameReviewMatchesFilters_(team, date, filters)) return;
+
+    const gcGameId = String(row[gcCol("GC_Game_ID")] || "").trim();
+    const submission = gcGameId ? submissionsByGcId[gcGameId] : null;
+    if (submission) {
+      submissions.forEach(item => {
+        if (item.gcGameId === gcGameId) usedSubmissionRows[item.rowIndex] = true;
+      });
+    }
+    const status = String(row[gcCol("Game_Status")] || "").trim();
+    const teamScore = row[gcCol("Team_Score")] === "" ? "" : row[gcCol("Team_Score")];
+    const opponentScore = row[gcCol("Opponent_Score")] === "" ? "" : row[gcCol("Opponent_Score")];
+    const result = row[gcCol("Result")] || buildResultTextGC_(status, teamScore, opponentScore);
+    const syncValue = row[gcCol("Sync_Time")];
+    const syncDate = syncValue ? new Date(syncValue) : null;
+    if (syncDate && !isNaN(syncDate.getTime()) && (!latestSync || syncDate > latestSync)) latestSync = syncDate;
+
+    const notes = submission ? submission.notes : "";
+    const completed = status.toLowerCase() === "completed";
+    games.push({
+      team: team,
+      gcGameId: gcGameId,
+      date: date,
+      startTime: formatTimeForDisplayGC_(row[gcCol("Start_Time")]),
+      opponent: row[gcCol("Opponent")] || "",
+      gameStatus: status,
+      teamScore: teamScore,
+      opponentScore: opponentScore,
+      result: result,
+      notes: notes,
+      hasNotes: !!notes,
+      notesMissing: completed && !notes,
+      hasSubmission: !!submission,
+      submittedBy: submission ? submission.submittedBy : "",
+      submissionTime: submission && submission.submissionTime
+        ? formatDateTime(new Date(submission.submissionTime))
+        : "",
+      matchStatus: submission ? "matched" : "gamechanger_only"
+    });
+  });
+
+  submissions.forEach(submission => {
+    if (usedSubmissionRows[submission.rowIndex]) return;
+    if (!gameReviewMatchesFilters_(submission.team, submission.date, filters)) return;
+    games.push({
+      team: submission.team,
+      gcGameId: submission.gcGameId,
+      date: submission.date,
+      startTime: submission.startTime,
+      opponent: submission.opponent,
+      gameStatus: "submitted",
+      teamScore: "",
+      opponentScore: "",
+      result: "",
+      notes: submission.notes,
+      hasNotes: !!submission.notes,
+      notesMissing: false,
+      hasSubmission: true,
+      submittedBy: submission.submittedBy,
+      submissionTime: submission.submissionTime
+        ? formatDateTime(new Date(submission.submissionTime))
+        : "",
+      matchStatus: submission.gcGameId ? "gamechanger_unavailable" : "manual"
+    });
+  });
+
+  games.sort((a, b) => {
+    const byDate = String(b.date).localeCompare(String(a.date));
+    if (byDate) return byDate;
+    return parseTimeMinutes_(b.startTime) - parseTimeMinutes_(a.startTime);
+  });
+
+  return {
+    games: games,
+    lastSynced: latestSync ? formatDateTime(latestSync) : "Never"
+  };
+}
+
+function gameReviewMatchesFilters_(team, date, filters) {
+  if (!team || !date) return false;
+  if (filters.team && team !== filters.team) return false;
+  if (filters.startDate && date < filters.startDate) return false;
+  if (filters.endDate && date > filters.endDate) return false;
+  return true;
+}
+
+function summarizeReviewGames_(games) {
+  const summary = createEmptyStatLine_();
+  (games || []).forEach(game => {
+    if (String(game.gameStatus || "").toLowerCase() !== "completed") return;
+    if (game.teamScore === "" || game.opponentScore === "") return;
+    const teamScore = Number(game.teamScore);
+    const opponentScore = Number(game.opponentScore);
+    if (!isNaN(teamScore) && !isNaN(opponentScore)) applyGameToStatLine_(summary, teamScore, opponentScore);
+  });
+  summary.missingNotes = (games || []).filter(game => game.notesMissing).length;
+  return summary;
+}
+
+function buildWeeklyReportData_(referenceDate) {
+  const window = getWeekWindowForDate_(referenceDate || new Date());
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const gcSheet = ss.getSheetByName("GC_Games_Sync");
+  const gamesSheet = ss.getSheetByName("Games");
+  if (!gcSheet || !gamesSheet) throw new Error("Missing GC_Games_Sync or Games sheet");
+
+  const gcValues = gcSheet.getDataRange().getValues();
+  const gameValues = gamesSheet.getDataRange().getValues();
+  const gcHeaders = gcValues.length ? gcValues.shift() : [];
+  const gameHeaders = gameValues.length ? gameValues.shift() : [];
+  const startDate = formatDateOnly(window.startDate);
+  const endDate = formatDateOnly(window.endDate);
+  const built = buildGameReviewFromRows_(gcValues, gcHeaders, gameValues, gameHeaders, {
+    startDate: startDate,
+    endDate: endDate
+  });
+
+  return buildWeeklyReportFromGames_(built.games, startDate, endDate, built.lastSynced);
+}
+
+function buildWeeklyReportFromGames_(games, startDate, endDate, lastSynced) {
+  const grouped = Object.create(null);
+  (games || []).forEach(game => {
+    if (!grouped[game.team]) grouped[game.team] = [];
+    grouped[game.team].push(game);
+  });
+
+  const teams = Object.keys(grouped).sort((a, b) => a.localeCompare(b)).map(team => ({
+    team: team,
+    summary: summarizeReviewGames_(grouped[team]),
+    games: grouped[team]
+  }));
+
+  return {
+    generatedAt: formatDateTime(new Date()),
+    startDate: startDate,
+    endDate: endDate,
+    lastSynced: lastSynced || "Never",
+    summary: summarizeReviewGames_(games),
+    teams: teams
+  };
+}
+
+/* =========================
    PERFORMANCE + ADMIN HELPERS
 ========================= */
 
@@ -1570,27 +1794,28 @@ function applyGameToStatLine_(line, teamScore, oppScore) {
 function getWeekWindows_() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  const current = getWeekWindowForDate_(today);
 
-  const currentWeekStart = getMondayOfWeek_(today);
-  const currentWeekEnd = new Date(currentWeekStart);
-  currentWeekEnd.setDate(currentWeekEnd.getDate() + 6);
-
-  const previousWeekStart = new Date(currentWeekStart);
+  const previousWeekStart = new Date(current.startDate);
   previousWeekStart.setDate(previousWeekStart.getDate() - 7);
 
   const previousWeekEnd = new Date(previousWeekStart);
   previousWeekEnd.setDate(previousWeekEnd.getDate() + 6);
 
   return {
-    current: {
-      startDate: currentWeekStart,
-      endDate: currentWeekEnd
-    },
+    current: current,
     previous: {
       startDate: previousWeekStart,
       endDate: previousWeekEnd
     }
   };
+}
+
+function getWeekWindowForDate_(date) {
+  const startDate = getMondayOfWeek_(date);
+  const endDate = new Date(startDate);
+  endDate.setDate(endDate.getDate() + 6);
+  return { startDate: startDate, endDate: endDate };
 }
 
 function getMondayOfWeek_(date) {
@@ -1703,6 +1928,301 @@ function addMissingOverride_(team, date, reason) {
     MISSING_OVERRIDE_TYPE,
     reason,
     new Date()
+  ]);
+}
+
+/* =========================
+   WEEKLY ORGANIZATION EMAIL
+========================= */
+
+function buildWeeklyReportEmailHtml_(report, logoSource) {
+  const summary = report.summary || createEmptyStatLine_();
+  const teams = Array.isArray(report.teams) ? report.teams : [];
+  const dateRange = weeklyEmailDateRange_(report.startDate, report.endDate);
+  const logo = escapeHtml_(logoSource || APP_LOGO_URL);
+  const reviewUrl = APP_BASE_URL + "/index.html?view=notes";
+
+  let teamHtml = "";
+  teams.forEach(team => {
+    const stats = team.summary || createEmptyStatLine_();
+    let gamesHtml = "";
+    (team.games || []).forEach(game => {
+      const result = String(game.result || "").trim();
+      const status = String(game.gameStatus || "").trim();
+      const outcomeColor = result.indexOf("W ") === 0
+        ? "#16794b"
+        : result.indexOf("L ") === 0 ? "#b42318" : "#6b6250";
+      const score = game.teamScore !== "" && game.opponentScore !== ""
+        ? escapeHtml_(String(game.teamScore)) + "–" + escapeHtml_(String(game.opponentScore))
+        : escapeHtml_(result || weeklyTitleCase_(status || "Score pending"));
+      const noteBody = game.hasNotes
+        ? escapeHtml_(game.notes).replace(/\n/g, "<br>")
+        : game.notesMissing
+          ? '<span style="color:#8a5a00;font-weight:bold;">Game notes have not been submitted.</span>'
+          : '<span style="color:#6b6250;">No notes recorded.</span>';
+      const matchLabel = game.matchStatus === "manual"
+        ? '<span style="color:#6b6250;font-size:12px;">Manual entry</span>'
+        : "";
+
+      gamesHtml += `
+        <div style="border:1px solid #e1d8c4;border-radius:8px;padding:12px;margin:0 0 10px;background:#fff;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+            <td style="vertical-align:top;padding-right:10px;">
+              <div style="font-size:12px;color:#6b6250;margin-bottom:4px;">${escapeHtml_(weeklyEmailGameDate_(game.date))}${game.startTime ? " • " + escapeHtml_(game.startTime) : ""}</div>
+              <div style="font-size:15px;font-weight:bold;color:#171717;">vs ${escapeHtml_(game.opponent || "Opponent unavailable")}</div>
+              ${matchLabel}
+            </td>
+            <td align="right" style="vertical-align:top;white-space:nowrap;">
+              <div style="font-size:20px;font-weight:bold;color:${outcomeColor};">${score}</div>
+              <div style="font-size:11px;color:#6b6250;text-transform:uppercase;">${escapeHtml_(result || status)}</div>
+            </td>
+          </tr></table>
+          <div style="border-top:1px solid #eee7d7;margin-top:10px;padding-top:10px;font-size:14px;line-height:1.5;color:#2c2922;">${noteBody}</div>
+        </div>`;
+    });
+
+    const teamUrl = reviewUrl + "&team=" + encodeURIComponent(team.team || "");
+    teamHtml += `
+      <div style="margin:18px 0 0;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#171717;border-radius:8px 8px 0 0;"><tr>
+          <td style="padding:12px 14px;color:#fff;font-size:18px;font-weight:bold;">${escapeHtml_(team.team || "")}</td>
+          <td align="right" style="padding:12px 14px;color:#d5bf76;font-size:13px;">${escapeHtml_(weeklyRecordText_(stats))} • RS ${Number(stats.runsScored || 0)} • RA ${Number(stats.runsAllowed || 0)}</td>
+        </tr></table>
+        <div style="border:1px solid #d9cfb8;border-top:none;border-radius:0 0 8px 8px;padding:12px;background:#fbf8f0;">
+          ${gamesHtml || '<div style="color:#6b6250;">No games this week.</div>'}
+          <a href="${escapeHtml_(teamUrl)}" style="display:inline-block;color:#70591d;font-weight:bold;text-decoration:none;font-size:13px;">Review ${escapeHtml_(team.team || "")} game notes →</a>
+        </div>
+      </div>`;
+  });
+
+  return `
+    <div style="margin:0;padding:22px 10px;background:#f4f1ea;font-family:Arial,Helvetica,sans-serif;color:#171717;">
+      <div style="max-width:680px;margin:0 auto;">
+        <div style="background:#050505;border-radius:10px;padding:18px;text-align:center;">
+          <img src="${logo}" width="82" height="82" alt="Noblesville Travel Baseball" style="display:block;margin:0 auto 10px;border-radius:50%;border:2px solid #b8a05c;">
+          <div style="color:#c8b46c;font-size:12px;font-weight:bold;text-transform:uppercase;letter-spacing:.7px;">Noblesville Travel Baseball</div>
+          <div style="color:#fff;font-size:24px;font-weight:bold;margin-top:5px;">Weekly Game Report</div>
+          <div style="color:#ddd5c0;font-size:14px;margin-top:5px;">${escapeHtml_(dateRange)}</div>
+        </div>
+
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="8" style="margin:10px -8px 0;width:calc(100% + 16px);"><tr>
+          ${weeklyMetricCell_("Record", weeklyRecordText_(summary))}
+          ${weeklyMetricCell_("Completed Games", Number(summary.completedGames || 0))}
+        </tr><tr>
+          ${weeklyMetricCell_("Runs Scored", Number(summary.runsScored || 0))}
+          ${weeklyMetricCell_("Runs Allowed", Number(summary.runsAllowed || 0))}
+        </tr></table>
+
+        ${teamHtml || '<div style="background:#fff;border:1px solid #d9cfb8;border-radius:8px;padding:18px;margin-top:16px;color:#6b6250;">No games are currently listed for this week.</div>'}
+
+        <div style="text-align:center;color:#6b6250;font-size:11px;line-height:1.5;padding:18px 8px;">
+          GameChanger data last synced ${escapeHtml_(report.lastSynced || "Never")}.<br>
+          <a href="${escapeHtml_(reviewUrl)}" style="color:#70591d;">Open Game Notes</a>
+        </div>
+      </div>
+    </div>`;
+}
+
+function weeklyMetricCell_(label, value) {
+  return `<td width="50%" style="background:#fff;border:1px solid #ddd2ba;border-radius:8px;padding:13px;text-align:center;">
+    <div style="font-size:11px;color:#6b6250;text-transform:uppercase;">${escapeHtml_(label)}</div>
+    <div style="font-size:24px;font-weight:bold;margin-top:4px;">${escapeHtml_(String(value))}</div>
+  </td>`;
+}
+
+function buildWeeklyReportPlainText_(report) {
+  const summary = report.summary || createEmptyStatLine_();
+  let body = "NOBLESVILLE TRAVEL BASEBALL\nWEEKLY GAME REPORT\n" +
+    weeklyEmailDateRange_(report.startDate, report.endDate) + "\n\n" +
+    "Organization: " + weeklyRecordText_(summary) +
+    " | Games " + Number(summary.completedGames || 0) +
+    " | RS " + Number(summary.runsScored || 0) +
+    " | RA " + Number(summary.runsAllowed || 0) + "\n";
+
+  (report.teams || []).forEach(team => {
+    const stats = team.summary || createEmptyStatLine_();
+    body += "\n" + team.team + " — " + weeklyRecordText_(stats) +
+      " | RS " + Number(stats.runsScored || 0) +
+      " | RA " + Number(stats.runsAllowed || 0) + "\n";
+    (team.games || []).forEach(game => {
+      body += "• " + game.date + (game.startTime ? " " + game.startTime : "") +
+        " vs " + (game.opponent || "Opponent unavailable") +
+        " — " + (game.result || game.gameStatus || "Score pending") + "\n" +
+        "  Notes: " + (game.notes || (game.notesMissing ? "MISSING" : "None")) + "\n";
+    });
+  });
+  body += "\nOpen Game Notes: " + APP_BASE_URL + "/index.html?view=notes";
+  return body;
+}
+
+function weeklyRecordText_(stats) {
+  const record = Number(stats.wins || 0) + "-" + Number(stats.losses || 0);
+  return Number(stats.ties || 0) ? record + "-" + Number(stats.ties || 0) : record;
+}
+
+function weeklyEmailDateRange_(startDate, endDate) {
+  const start = parseLocalDate(startDate);
+  const end = parseLocalDate(endDate);
+  return Utilities.formatDate(start, WEEKLY_REPORT_TIMEZONE, "MMM d") + "–" +
+    Utilities.formatDate(end, WEEKLY_REPORT_TIMEZONE, "MMM d, yyyy");
+}
+
+function weeklyEmailGameDate_(date) {
+  return Utilities.formatDate(parseLocalDate(date), WEEKLY_REPORT_TIMEZONE, "EEE, MMM d");
+}
+
+function weeklyTitleCase_(value) {
+  const text = String(value || "").trim();
+  return text ? text.charAt(0).toUpperCase() + text.slice(1).toLowerCase() : "";
+}
+
+function escapeHtml_(value) {
+  return String(value == null ? "" : value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function getActiveWeeklyRecipients_() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(WEEKLY_RECIPIENTS_SHEET);
+  if (!sheet || sheet.getLastRow() < 2) return [];
+  const values = sheet.getRange(1, 1, sheet.getLastRow(), 3).getValues();
+  const headers = values.shift();
+  const nameCol = headers.indexOf("Name");
+  const emailCol = headers.indexOf("Email");
+  const activeCol = headers.indexOf("Active");
+  const seen = Object.create(null);
+
+  return values.map(row => ({
+    name: nameCol < 0 ? "" : String(row[nameCol] || "").trim(),
+    email: emailCol < 0 ? "" : String(row[emailCol] || "").trim(),
+    active: activeCol >= 0 && isTruthy_(row[activeCol])
+  })).filter(recipient => {
+    const key = recipient.email.toLowerCase();
+    if (!recipient.active || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient.email) || seen[key]) return false;
+    seen[key] = true;
+    return true;
+  });
+}
+
+function sendWeeklyReportTest() {
+  const report = buildWeeklyReportData_(new Date());
+  sendWeeklyReportToRecipients_([{ name: "Admin", email: ADMIN_EMAIL }], report);
+  logWeeklyReport_(report, 1, "Test", "Test report sent to " + ADMIN_EMAIL);
+  return "Test report sent to " + ADMIN_EMAIL;
+}
+
+function sendWeeklyReportNow() {
+  const recipients = getActiveWeeklyRecipients_();
+  if (!recipients.length) throw new Error("No active weekly email recipients are configured");
+  syncGameChangerAndSubmissionCheck();
+  const report = buildWeeklyReportData_(new Date());
+  sendWeeklyReportToRecipients_(recipients, report);
+  markWeeklyReportSent_(report.startDate);
+  logWeeklyReport_(report, recipients.length, "Sent", "Manual weekly report sent");
+  return "Weekly report sent to " + recipients.length + " recipient(s)";
+}
+
+function sendWeeklyReportToRecipients_(recipients, report) {
+  if (MailApp.getRemainingDailyQuota() < recipients.length) {
+    throw new Error("Not enough email recipient quota remains for the weekly report");
+  }
+
+  let logoSource = APP_LOGO_URL;
+  let logoBlob = null;
+  try {
+    const response = UrlFetchApp.fetch(APP_LOGO_URL, { muteHttpExceptions: true });
+    if (response.getResponseCode() >= 200 && response.getResponseCode() < 300) {
+      logoBlob = response.getBlob().setName("nyb-logo.png");
+      logoSource = "cid:nybLogo";
+    }
+  } catch (err) {
+    console.warn("Unable to inline the app logo: " + err);
+  }
+
+  const subject = "NYB Weekly Game Report • " + weeklyEmailDateRange_(report.startDate, report.endDate);
+  const body = buildWeeklyReportPlainText_(report);
+  const htmlBody = buildWeeklyReportEmailHtml_(report, logoSource);
+
+  recipients.forEach(recipient => {
+    const message = {
+      to: recipient.email,
+      subject: subject,
+      body: body,
+      htmlBody: htmlBody,
+      name: "Noblesville Travel Baseball"
+    };
+    if (logoBlob) message.inlineImages = { nybLogo: logoBlob };
+    MailApp.sendEmail(message);
+  });
+}
+
+function maybeSendWeeklyReport_(now, alreadySynced) {
+  const day = Number(Utilities.formatDate(now, WEEKLY_REPORT_TIMEZONE, "u"));
+  const hour = Number(Utilities.formatDate(now, WEEKLY_REPORT_TIMEZONE, "H"));
+  if (day !== 7 || hour < 20) return { status: "not_due" };
+
+  const window = getWeekWindowForDate_(now);
+  const weekStart = formatDateOnly(window.startDate);
+  if (weeklyReportWasSent_(weekStart)) return { status: "already_sent", weekStart: weekStart };
+
+  const recipients = getActiveWeeklyRecipients_();
+  if (!recipients.length) return { status: "no_recipients", weekStart: weekStart };
+
+  let report = null;
+  try {
+    if (!alreadySynced) syncGameChangerAndSubmissionCheck();
+    report = buildWeeklyReportData_(now);
+    if (!Number(report.summary.completedGames || 0)) {
+      markWeeklyReportSent_(weekStart);
+      logWeeklyReport_(report, recipients.length, "Skipped", "No completed games this week");
+      return { status: "no_games", weekStart: weekStart };
+    }
+    sendWeeklyReportToRecipients_(recipients, report);
+    markWeeklyReportSent_(weekStart);
+    logWeeklyReport_(report, recipients.length, "Sent", "Automatic Sunday report sent");
+    return { status: "sent", weekStart: weekStart, recipients: recipients.length };
+  } catch (err) {
+    const failedReport = report || {
+      startDate: weekStart,
+      endDate: formatDateOnly(window.endDate),
+      summary: { completedGames: 0 }
+    };
+    try {
+      logWeeklyReport_(failedReport, recipients.length, "Error", err.message || String(err));
+    } catch (logErr) {
+      console.error("Unable to log weekly report failure: " + logErr);
+    }
+    console.error("Weekly report failed: " + err);
+    return { status: "error", weekStart: weekStart, message: err.message || String(err) };
+  }
+}
+
+function weeklyReportWasSent_(weekStart) {
+  return PropertiesService.getScriptProperties().getProperty("WEEKLY_REPORT_SENT_" + weekStart) === "true";
+}
+
+function markWeeklyReportSent_(weekStart) {
+  PropertiesService.getScriptProperties().setProperty("WEEKLY_REPORT_SENT_" + weekStart, "true");
+}
+
+function logWeeklyReport_(report, recipientCount, status, message) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(WEEKLY_REPORT_LOG_SHEET);
+  if (!sheet) {
+    sheet = ss.insertSheet(WEEKLY_REPORT_LOG_SHEET);
+    sheet.appendRow(["Week Start", "Week End", "Sent At", "Recipient Count", "Completed Games", "Status", "Message"]);
+  }
+  sheet.appendRow([
+    parseLocalDate(report.startDate),
+    parseLocalDate(report.endDate),
+    new Date(),
+    recipientCount,
+    Number((report.summary || {}).completedGames || 0),
+    status,
+    message || ""
   ]);
 }
 
@@ -1858,11 +2378,23 @@ function smartGameChangerSync() {
   const lastRunValue = properties.getProperty("GC_LAST_SOURCE_SYNC_AT");
   const lastRun = lastRunValue ? new Date(lastRunValue) : null;
   const minutesSince = lastRun && !isNaN(lastRun.getTime()) ? (new Date().getTime() - lastRun.getTime()) / 60000 : Infinity;
+  let ran = false;
   if (minutesSince < policy.minutes) {
-    return { ran: false, reason: "not_due", nextPolicy: policy };
+    return {
+      ran: false,
+      reason: "not_due",
+      nextPolicy: policy,
+      weeklyReport: maybeSendWeeklyReport_(new Date(), false)
+    };
   }
   syncGameChangerAndSubmissionCheck();
-  return { ran: true, reason: "due", nextPolicy: getGameChangerSyncPolicy_() };
+  ran = true;
+  return {
+    ran: ran,
+    reason: "due",
+    nextPolicy: getGameChangerSyncPolicy_(),
+    weeklyReport: maybeSendWeeklyReport_(new Date(), true)
+  };
 }
 
 function installSmartGameChangerSyncTrigger() {
@@ -1870,7 +2402,11 @@ function installSmartGameChangerSyncTrigger() {
     if (trigger.getHandlerFunction() === "smartGameChangerSync") ScriptApp.deleteTrigger(trigger);
   });
   ScriptApp.newTrigger("smartGameChangerSync").timeBased().everyHours(1).create();
-  return "Installed hourly policy check. GameChanger itself is contacted hourly near games, every 2 hours during active weeks, and daily in quiet periods.";
+  return "Installed hourly policy check. GameChanger itself is contacted hourly near games, every 2 hours during active weeks, and daily in quiet periods. The first Sunday check after 8:00 PM Eastern sends the weekly report when active recipients exist.";
+}
+
+function isSmartSyncTriggerInstalled_() {
+  return ScriptApp.getProjectTriggers().some(trigger => trigger.getHandlerFunction() === "smartGameChangerSync");
 }
 
 function syncGameChangerAndSubmissionCheck() {
