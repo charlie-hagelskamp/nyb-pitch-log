@@ -2143,7 +2143,7 @@ function sendWeeklyReportToRecipients_(recipients, report) {
     console.warn("Unable to inline the app logo: " + err);
   }
 
-  const subject = "NYB Weekly Game Report • " + weeklyEmailDateRange_(report.startDate, report.endDate);
+  const subject = "NYB Council Weekly Game Report • " + weeklyEmailDateRange_(report.startDate, report.endDate);
   const body = buildWeeklyReportPlainText_(report);
   const htmlBody = buildWeeklyReportEmailHtml_(report, logoSource);
 
