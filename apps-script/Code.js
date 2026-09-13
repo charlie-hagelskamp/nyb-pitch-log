@@ -20,6 +20,7 @@ const APP_LOGO_URL = APP_BASE_URL + "/nyb-logo.png";
 const WEEKLY_REPORT_TIMEZONE = "America/New_York";
 const WEEKLY_RECIPIENTS_SHEET = "Weekly_Email_Recipients";
 const WEEKLY_REPORT_LOG_SHEET = "Weekly_Report_Log";
+const PITCH_LOG_SPREADSHEET_ID = "1I52gbuegk6fYZOVo0lPjoJHCiVIqdBXUggz3oq3Twxc";
 
 function doGet(e) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1241,7 +1242,7 @@ function summarizeReviewGames_(games) {
 
 function buildWeeklyReportData_(referenceDate) {
   const window = getWeekWindowForDate_(referenceDate || new Date());
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = getPitchLogSpreadsheet_();
   const gcSheet = ss.getSheetByName("GC_Games_Sync");
   const gamesSheet = ss.getSheetByName("Games");
   if (!gcSheet || !gamesSheet) throw new Error("Missing GC_Games_Sync or Games sheet");
@@ -2086,7 +2087,7 @@ function escapeHtml_(value) {
 }
 
 function getActiveWeeklyRecipients_() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(WEEKLY_RECIPIENTS_SHEET);
+  const sheet = getPitchLogSpreadsheet_().getSheetByName(WEEKLY_RECIPIENTS_SHEET);
   if (!sheet || sheet.getLastRow() < 2) return [];
   const values = sheet.getRange(1, 1, sheet.getLastRow(), 3).getValues();
   const headers = values.shift();
@@ -2209,7 +2210,7 @@ function markWeeklyReportSent_(weekStart) {
 }
 
 function logWeeklyReport_(report, recipientCount, status, message) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = getPitchLogSpreadsheet_();
   let sheet = ss.getSheetByName(WEEKLY_REPORT_LOG_SHEET);
   if (!sheet) {
     sheet = ss.insertSheet(WEEKLY_REPORT_LOG_SHEET);
@@ -2224,6 +2225,10 @@ function logWeeklyReport_(report, recipientCount, status, message) {
     status,
     message || ""
   ]);
+}
+
+function getPitchLogSpreadsheet_() {
+  return SpreadsheetApp.openById(PITCH_LOG_SPREADSHEET_ID);
 }
 
 /* =========================
