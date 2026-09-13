@@ -250,30 +250,65 @@ button:disabled{
 
 .notes-card{
   background:#fff;
-  border:1px solid #cfd8ea;
-  border-radius:6px;
-  padding:12px;
-  margin-top:10px;
+  border:1px solid #ded6c5;
+  border-left:5px solid #b8a05c;
+  border-radius:12px;
+  box-shadow:0 3px 12px rgba(50,40,18,.07);
+  padding:14px;
+  margin-top:12px;
+  overflow:hidden;
+}
+
+.notes-card.win-card{
+  border-left-color:#16824f;
+}
+
+.notes-card.loss-card{
+  border-left-color:#c1352a;
 }
 
 .notes-card.notes-missing{
   border-color:#d39a27;
-  border-left-width:6px;
+  border-left-width:5px;
   background:#fffaf0;
 }
 
 .notes-card-top{
-  display:flex;
-  justify-content:space-between;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
   align-items:flex-start;
-  gap:14px;
+  gap:12px;
+}
+
+.notes-game-info{
+  min-width:0;
+}
+
+.notes-result-panel{
+  min-width:88px;
+  padding:8px 10px;
+  border:1px solid #ded4bd;
+  border-radius:10px;
+  background:#f6f1e5;
+  text-align:center;
+}
+
+.notes-result-panel.win{
+  border-color:#b8ddca;
+  background:#edf8f2;
+}
+
+.notes-result-panel.loss{
+  border-color:#edc2bd;
+  background:#fff2f0;
 }
 
 .notes-score{
-  flex:0 0 auto;
-  text-align:right;
-  font-size:22px;
-  font-weight:bold;
+  white-space:nowrap;
+  font-size:24px;
+  line-height:1;
+  font-weight:800;
+  letter-spacing:-.5px;
 }
 
 .notes-score.win{color:#16794b;}
@@ -281,10 +316,11 @@ button:disabled{
 .notes-score.other{color:#665d49;}
 
 .notes-status{
-  margin-top:3px;
+  margin-top:5px;
   color:#665d49;
-  font-size:11px;
-  font-weight:bold;
+  font-size:10px;
+  font-weight:800;
+  letter-spacing:.7px;
   text-transform:uppercase;
 }
 
@@ -297,9 +333,10 @@ button:disabled{
 
 .notes-summary-card{
   border:1px solid #dfd5bd;
-  border-radius:6px;
-  background:#faf7ef;
-  padding:10px;
+  border-radius:10px;
+  background:linear-gradient(180deg,#fff 0%,#faf6ea 100%);
+  box-shadow:0 2px 7px rgba(50,40,18,.05);
+  padding:11px 8px;
   text-align:center;
 }
 
@@ -310,8 +347,9 @@ button:disabled{
 }
 
 .notes-summary-value{
-  font-size:21px;
-  font-weight:bold;
+  color:#292217;
+  font-size:23px;
+  font-weight:800;
   margin-top:3px;
 }
 
@@ -343,21 +381,57 @@ button:disabled{
 }
 
 .notes-card-date{
-  font-weight:bold;
-  margin-bottom:6px;
+  display:inline-block;
+  color:#604d1e;
+  background:#f3ead3;
+  border-radius:999px;
+  padding:4px 8px;
+  font-size:12px;
+  font-weight:800;
+  margin-bottom:8px;
 }
 
 .notes-card-opp{
-  color:#333;
-  margin-bottom:8px;
+  color:#222;
+  font-size:16px;
+  font-weight:700;
+  line-height:1.25;
+  overflow-wrap:anywhere;
+}
+
+.notes-opponent-label{
+  display:block;
+  color:#756a55;
+  font-size:10px;
+  font-weight:800;
+  letter-spacing:.7px;
+  margin-bottom:2px;
+  text-transform:uppercase;
 }
 
 .notes-card-text{
   white-space:pre-wrap;
-  line-height:1.4;
+  color:#2d2921;
+  line-height:1.48;
   border-top:1px solid #eee7d7;
-  margin-top:10px;
-  padding-top:10px;
+  margin-top:13px;
+  padding-top:12px;
+}
+
+.notes-label{
+  display:block;
+  color:#756a55;
+  font-size:10px;
+  font-weight:800;
+  letter-spacing:.7px;
+  margin-bottom:5px;
+  text-transform:uppercase;
+}
+
+#gameNotesLogs{
+  background:#f8f5ed;
+  border:1px solid #e1d7c1;
+  border-radius:10px;
 }
 
 .empty-message{
@@ -701,7 +775,20 @@ button:disabled{
   }
 
   .notes-card-top{
-    gap:8px;
+    gap:10px;
+  }
+
+  .notes-card{
+    padding:13px 12px;
+  }
+
+  .notes-result-panel{
+    min-width:78px;
+    padding:8px;
+  }
+
+  .notes-score{
+    font-size:22px;
   }
 
   .header{
@@ -1812,6 +1899,11 @@ function loadGameNotesLogs(team){
           ? `${escapeHtml(String(item.teamScore))}-${escapeHtml(String(item.opponentScore))}`
           : escapeHtml(result || titleCase(item.gameStatus || "Score pending"));
         const scoreClass = result.startsWith("W ") ? "win" : result.startsWith("L ") ? "loss" : "other";
+        const outcomeLabel = result.startsWith("W ")
+          ? "Win"
+          : result.startsWith("L ") ? "Loss"
+          : result.startsWith("T ") ? "Tie"
+          : titleCase(item.gameStatus || "Score pending");
         const noteText = item.notes
           ? escapeHtml(item.notes)
           : item.notesMissing ? "Game notes have not been submitted." : "No notes recorded.";
@@ -1821,19 +1913,19 @@ function loadGameNotesLogs(team){
           : item.matchStatus === "gamechanger_unavailable" ? `<span class="notes-chip">GameChanger result unavailable</span>`
           : "";
         html += `
-          <div class="notes-card ${item.notesMissing ? "notes-missing" : ""}">
+          <div class="notes-card ${scoreClass}-card ${item.notesMissing ? "notes-missing" : ""}">
             <div class="notes-card-top">
-              <div>
+              <div class="notes-game-info">
                 <div class="notes-card-date">${formatDayAndDate(item.date)}${item.startTime ? " • " + escapeHtml(item.startTime) : ""}</div>
-                <div class="notes-card-opp"><strong>Opponent:</strong> ${escapeHtml(item.opponent || "Opponent unavailable")}</div>
+                <div class="notes-card-opp"><span class="notes-opponent-label">Opponent</span>${escapeHtml(item.opponent || "Opponent unavailable")}</div>
                 ${badge}
               </div>
-              <div>
+              <div class="notes-result-panel ${scoreClass}">
                 <div class="notes-score ${scoreClass}">${scoreText}</div>
-                <div class="notes-status">${escapeHtml(result || item.gameStatus || "")}</div>
+                <div class="notes-status">${escapeHtml(outcomeLabel)}</div>
               </div>
             </div>
-            <div class="notes-card-text ${item.notesMissing ? "missing" : ""}">${noteText}</div>
+            <div class="notes-card-text ${item.notesMissing ? "missing" : ""}"><span class="notes-label">Game Notes</span>${noteText}</div>
           </div>
         `;
       });
