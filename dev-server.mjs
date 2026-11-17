@@ -151,6 +151,11 @@ function mockTeamNotes(team){
 }
 
 function mockWinterPractices(){
+  const yesterday = new Date();
+  yesterday.setHours(12,0,0,0);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayIso = localDate(-1);
+  const yesterdayMonth = yesterday.toLocaleString("en-US",{month:"long"});
   return {
     sourceTitle:"26/27 Hack Shack Times",
     sourceTabs:["Hack Shack","Field House"],
@@ -159,6 +164,7 @@ function mockWinterPractices(){
     teams:["7U Black","9B","10U Black","10U Gold","12U Gold"],
     months:["November","December","January","February","March"],
     practices:[
+      {date:yesterdayIso,displayDate:yesterday.toLocaleString("en-US",{month:"short",day:"numeric"}),day:yesterday.toLocaleString("en-US",{weekday:"short"}),month:yesterdayMonth,time:"4pm-5pm",location:"Hack Shack",team:"10U Gold",allTeams:false,tentative:false,sourceTab:"Hack Shack"},
       {date:"2026-11-30",displayDate:"Nov 30",day:"Mon",month:"November",time:"6pm-7pm",location:"Hack Shack",team:"10U Gold",allTeams:false,tentative:false,sourceTab:"Hack Shack"},
       {date:"2026-12-01",displayDate:"Dec 1",day:"Tue",month:"December",time:"5pm-6pm",location:"Hack Shack",team:"7U Black",allTeams:false,tentative:false,sourceTab:"Hack Shack"},
       {date:"2026-12-01",displayDate:"Dec 1",day:"Tue",month:"December",time:"6pm-7pm",location:"Hack Shack",team:"10U Black",allTeams:false,tentative:false,sourceTab:"Hack Shack"},
