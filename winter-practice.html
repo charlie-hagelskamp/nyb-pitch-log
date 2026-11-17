@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Noblesville Travel Baseball Winter Practices</title>
+<style>
+body{font-family:Arial,Helvetica,sans-serif;margin:0;background:#f4f1ea;color:#171717}.page-shell{max-width:1180px;margin:auto;padding:18px}.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;gap:12px;flex-wrap:wrap;background:#050505;border:1px solid #2c2618;border-radius:8px;padding:12px;box-shadow:0 10px 28px rgba(0,0,0,.16)}.header-left{display:flex;align-items:center;gap:15px;flex:1 1 auto;min-width:0}.header img.logo{width:72px;height:72px;object-fit:cover;border-radius:50%;border:2px solid #b8a05c;background:#050505}.header h1{font-size:1.35em;margin:0;color:#fff}.header-kicker{color:#c8b46c;font-size:12px;font-weight:bold;margin-bottom:4px;text-transform:uppercase}.header-actions{display:flex;gap:8px;flex-wrap:wrap}.header a.action-link{text-decoration:none;background:#1c1c1c;color:#f7f3e8;padding:10px 14px;border-radius:4px;font-size:14px;font-weight:bold;display:inline-block;border:1px solid #3c3522}.header a.action-link:hover,.header a.action-link.active{background:#b8a05c;color:#050505}.header a.action-link.tournaments-link{flex:1 0 100%;box-sizing:border-box;background:#f7f3e8;border-color:#b8a05c;color:#171717;text-align:center}.intro{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}.page-title{margin:0;font-size:30px}.intro-copy{color:#554b35;line-height:1.5;margin:8px 0 0;max-width:760px}.refresh-btn{border:0;border-radius:6px;background:#080808;color:#fff;padding:11px 15px;font-size:14px;font-weight:bold;cursor:pointer}.refresh-btn:hover{background:#b8a05c;color:#050505}.refresh-btn:disabled{opacity:.55;cursor:wait}.section{background:#fff;border:1px solid #dfd5bd;border-radius:10px;padding:14px;margin-bottom:18px;box-shadow:0 8px 20px rgba(30,24,12,.06)}.filters{display:grid;grid-template-columns:1fr 1fr;gap:12px}label{font-size:13px;font-weight:bold;color:#272317}select{width:100%;padding:10px;margin-top:6px;font-size:16px;border:1px solid #c8b98e;border-radius:6px;background:#fff}.status-row{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;color:#555;font-size:13px}.read-only{color:#326b3f;font-weight:bold}.schedule{display:grid;gap:14px}.date-group{border:1px solid #dfd5bd;border-radius:10px;overflow:hidden;background:#fff}.date-heading{background:linear-gradient(90deg,#171717,#332b1c);color:#fff;padding:11px 13px;font-size:16px;font-weight:bold}.practice-row{display:grid;grid-template-columns:116px minmax(0,1fr) auto;gap:12px;padding:13px;border-top:1px solid #eee4cc;align-items:center}.practice-time{font-weight:800;color:#292217}.practice-location{font-weight:800}.location-note{display:block;color:#6c624f;font-size:12px;font-weight:normal;margin-top:3px}.team-pill{display:inline-block;background:#050505;color:#fff;border-radius:999px;padding:6px 10px;font-size:12px;font-weight:bold;white-space:nowrap}.team-pill.all-teams{background:#e8f3eb;color:#24633a;border:1px solid #bdd6c4}.team-pill.tentative{background:#fff3d6;color:#7a4c00;border:1px solid #e6c36c}.location-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#b8a05c;margin-right:7px}.practice-row.field-house{background:#f8fbf8}.practice-row.field-house .location-dot{background:#3e8a58}.legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;color:#6c624f;font-size:12px}.legend span{display:flex;align-items:center}.empty,.loading{color:#666;padding:18px;text-align:center}.loading-state{display:flex;align-items:center;justify-content:center;gap:10px;font-weight:bold}.loading-spinner{width:20px;height:20px;border:3px solid #ded6c4;border-top-color:#8e7332;border-radius:50%;animation:practiceSpin .8s linear infinite}.error{color:#b42318;font-weight:bold;padding:18px;text-align:center}@keyframes practiceSpin{to{transform:rotate(360deg)}}
+@media(max-width:700px){.page-shell{padding:12px}.header-left,.header-actions{width:100%}.header a.action-link{flex:1 1 auto;text-align:center}.header img.logo{width:62px;height:62px}.filters{grid-template-columns:1fr}.practice-row{grid-template-columns:1fr auto;gap:8px 10px}.practice-time{grid-column:1/-1;color:#70591d}.team-pill{grid-column:2;grid-row:2}.intro{align-items:flex-start}.page-title{font-size:27px}}
+</style>
+</head>
+<body>
+<div class="page-shell">
+  <div class="header">
+    <div class="header-left"><img src="nyb-logo.png" class="logo" alt="Noblesville Travel Baseball"><div><div class="header-kicker">Coach Hub</div><h1>Noblesville Travel Baseball</h1></div></div>
+    <div class="header-actions"><a href="index.html" class="action-link">Pitch Log</a><a href="drills.html" class="action-link">Drills</a><a href="winter-practice.html" class="action-link active">Winter Practices</a><a href="admin.html" class="action-link">Admin</a><a href="https://nybtournaments.com/" class="action-link tournaments-link" target="_blank" rel="noopener">NYB Tournaments ↗</a></div>
+  </div>
+  <div class="intro">
+    <div><h2 class="page-title">Winter Practices</h2><p class="intro-copy">Choose your team to see its Hack Shack assignments together with Field House sessions for all teams.</p></div>
+    <button id="refreshBtn" class="refresh-btn" onclick="loadPractices()">Refresh schedule</button>
+  </div>
+  <div class="section filters">
+    <label>Team<select id="teamFilter" onchange="renderPractices()"><option value="All">All teams</option></select></label>
+    <label>Month<select id="monthFilter" onchange="renderPractices()"><option value="All">All months</option></select></label>
+  </div>
+  <div class="section status-row"><span id="count">Loading schedule…</span><span id="sourceStatus" class="read-only">Schedule sheet: read-only</span></div>
+  <div id="schedule" class="section loading"><div class="loading-state"><span class="loading-spinner"></span><span>Loading winter practices…</span></div></div>
+</div>
+<script>
+const PRODUCTION_API="https://script.google.com/macros/s/AKfycbwYw3hAF-O6qeiDkR9pb10OuwgXc8PrX48ZiRj2KCcrkAaPfFj9dJG4YXesRe4rsUc4/exec";
+const API=["localhost","127.0.0.1"].includes(location.hostname)?"/api":PRODUCTION_API;
+let scheduleData={teams:[],months:[],practices:[]};
+function loadPractices(){
+  const button=document.getElementById("refreshBtn");button.disabled=true;button.textContent="Refreshing…";
+  document.getElementById("schedule").innerHTML='<div class="loading loading-state" role="status"><span class="loading-spinner" aria-hidden="true"></span><span>Reading Hack Shack and Field House…</span></div>';
+  const callbackName="winterPracticesCallback_"+Date.now();const script=document.createElement("script");
+  window[callbackName]=data=>{delete window[callbackName];script.remove();button.disabled=false;button.textContent="Refresh schedule";if(data&&data.error){showError(data.message||"Unable to load practices.");return}scheduleData=data||{teams:[],months:[],practices:[]};populateFilters();document.getElementById("sourceStatus").textContent=`Hack Shack + Field House: read-only · Updated ${scheduleData.refreshedAt||"now"}`;renderPractices()};
+  script.onerror=()=>{delete window[callbackName];script.remove();button.disabled=false;button.textContent="Refresh schedule";showError("Unable to reach the schedule service.")};
+  script.src=API+"?winterPractices=1&callback="+callbackName+"&_="+Date.now();document.body.appendChild(script);
+}
+function populateFilters(){
+  const team=document.getElementById("teamFilter"),selectedTeam=team.value;team.innerHTML='<option value="All">All teams</option>'+scheduleData.teams.map(value=>`<option>${escapeHtml(value)}</option>`).join("");if(scheduleData.teams.includes(selectedTeam))team.value=selectedTeam;
+  const month=document.getElementById("monthFilter"),selectedMonth=month.value;month.innerHTML='<option value="All">All months</option>'+scheduleData.months.map(value=>`<option>${escapeHtml(value)}</option>`).join("");if(scheduleData.months.includes(selectedMonth))month.value=selectedMonth;
+}
+function renderPractices(){
+  const month=document.getElementById("monthFilter").value,team=document.getElementById("teamFilter").value;
+  const rows=scheduleData.practices.filter(item=>(month==="All"||item.month===month)&&(team==="All"||item.allTeams||item.team===team));
+  const teamLabel=team==="All"?"all teams":team;document.getElementById("count").textContent=`${rows.length} practice session${rows.length===1?"":"s"} shown for ${teamLabel}`;
+  const target=document.getElementById("schedule");if(!rows.length){target.innerHTML='<div class="empty">No winter practices match these filters.</div>';return}
+  const groups={};rows.forEach(item=>(groups[item.date]||(groups[item.date]=[])).push(item));
+  target.innerHTML='<div class="schedule">'+Object.keys(groups).map(date=>{const items=groups[date];return `<section class="date-group"><div class="date-heading">${escapeHtml(items[0].day)}, ${escapeHtml(items[0].displayDate)}</div>${items.map(item=>practiceRow(item)).join("")}</section>`}).join("")+'</div><div class="legend"><span><i class="location-dot"></i>Hack Shack team assignment</span><span><i class="location-dot" style="background:#3e8a58"></i>Field House for all teams</span></div>';
+}
+function practiceRow(item){
+  const teamClass=item.allTeams?"all-teams":item.tentative?"tentative":"";const teamLabel=item.allTeams?"All teams":item.team+(item.tentative?" · tentative":"");
+  return `<div class="practice-row ${item.allTeams?"field-house":""}"><div class="practice-time">${escapeHtml(item.time)}</div><div class="practice-location"><span class="location-dot"></span>${escapeHtml(item.location)}<span class="location-note">${item.allTeams?"Organization-wide session":"Team assignment"}</span></div><div class="team-pill ${teamClass}">${escapeHtml(teamLabel)}</div></div>`;
+}
+function showError(message){document.getElementById("count").textContent="Schedule unavailable";document.getElementById("schedule").innerHTML=`<div class="error">${escapeHtml(message)}</div>`}
+function escapeHtml(value){return String(value??"").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[char]))}
+loadPractices();
+</script>
+<script src="site-analytics.js" defer></script>
+</body>
+</html>

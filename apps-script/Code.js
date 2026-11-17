@@ -12,9 +12,9 @@ const GC_COMPARE_START_DATE = "2026-04-18";
 const DEFAULT_SEASON_YEAR = 2026;
 const FALL_SEASON_START_DATE = "2026-08-01";
 const MISSING_OVERRIDE_TYPE = "Ignore Missing";
-const FALL_PRACTICE_SOURCE_ID = "1KpbgC-0iugmxSMpjsXFx1nPUyPRrW32QHp6Bd_G41eU";
-const FALL_PRACTICE_SOURCE_TAB = "Master";
-const FALL_PRACTICE_TEAMS = ["7B", "8B", "8G", "10B", "10G", "11B", "11G", "12G"];
+const WINTER_PRACTICE_SOURCE_ID = "1CNudLS9BMbCRbUIrN0eHn7TxhrqkI9QgGuC0jG9xHtY";
+const WINTER_HACK_SHACK_TAB = "Hack Shack";
+const WINTER_FIELD_HOUSE_TAB = "Field House";
 const APP_BASE_URL = "https://charlie-hagelskamp.github.io/nyb-pitch-log";
 const APP_LOGO_URL = APP_BASE_URL + "/nyb-logo.png";
 const WEEKLY_REPORT_TIMEZONE = "America/New_York";
@@ -98,12 +98,12 @@ function doGet(e) {
   }
 
   // =========================
-  // Read-only fall practice endpoint
-  // ?fallPractices=1&callback=...
+  // Read-only winter practice endpoint
+  // ?winterPractices=1&callback=...
   // =========================
-  if (params.fallPractices) {
+  if (params.winterPractices || params.fallPractices) {
     try {
-      return outputJsonp(callback, buildFallPracticeSchedule_());
+      return outputJsonp(callback, buildWinterPracticeSchedule_());
     } catch (err) {
       return outputJsonp(callback, {
         error: true,
@@ -1483,71 +1483,92 @@ function buildCurrentWeekSchedule_() {
   };
 }
 
-function buildFallPracticeSchedule_() {
+function buildWinterPracticeSchedule_() {
   // This connection is intentionally read-only. It never calls a source-sheet
   // setter, append, clear, delete, or batch-update method.
-  const source = SpreadsheetApp.openById(FALL_PRACTICE_SOURCE_ID);
-  const master = source.getSheetByName(FALL_PRACTICE_SOURCE_TAB);
+  const source = SpreadsheetApp.openById(WINTER_PRACTICE_SOURCE_ID);
+  const hackShack = source.getSheetByName(WINTER_HACK_SHACK_TAB);
+  const fieldHouse = source.getSheetByName(WINTER_FIELD_HOUSE_TAB);
 
-  if (!master) {
-    throw new Error("The Master schedule tab was not found.");
+  if (!hackShack || !fieldHouse) {
+    throw new Error("The Hack Shack and Field House schedule tabs are required.");
   }
 
-  const values = master.getRange(1, 1, 120, Math.min(master.getLastColumn(), 377)).getDisplayValues();
-  const dayLayouts = [
-    { dateRow: 2, nextDateRow: 9 },
-    { dateRow: 9, nextDateRow: 16 },
-    { dateRow: 16, nextDateRow: 23 },
-    { dateRow: 23, nextDateRow: 30 },
-    { dateRow: 30, nextDateRow: 37 },
-    { dateRow: 37, nextDateRow: 43 },
-    { dateRow: 43, nextDateRow: 121 }
-  ];
-  const allowedTeams = {};
-  FALL_PRACTICE_TEAMS.forEach(team => allowedTeams[team] = true);
+  const hackValues = hackShack.getLastRow()
+    ? hackShack.getRange(1, 1, hackShack.getLastRow(), Math.max(8, hackShack.getLastColumn())).getDisplayValues()
+    : [];
+  const fieldValues = fieldHouse.getLastRow()
+    ? fieldHouse.getRange(1, 1, fieldHouse.getLastRow(), Math.max(2, fieldHouse.getLastColumn())).getDisplayValues()
+    : [];
+  const schedule = buildWinterPracticeScheduleFromValues_(hackValues, fieldValues, DEFAULT_SEASON_YEAR);
 
+  schedule.sourceTitle = source.getName();
+  schedule.sourceTabs = [WINTER_HACK_SHACK_TAB, WINTER_FIELD_HOUSE_TAB];
+  schedule.readOnly = true;
+  schedule.refreshedAt = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MMM d, yyyy h:mm a");
+  return schedule;
+}
+
+function buildWinterPracticeScheduleFromValues_(hackValues, fieldValues, seasonStartYear) {
   const practices = [];
+  const teams = {};
   const seen = {};
+  let weekStart = null;
 
-  dayLayouts.forEach(layout => {
-    const dateIndex = layout.dateRow - 1;
-    const fieldIndex = dateIndex + 1;
-    const firstTimeIndex = dateIndex + 2;
-    const lastTimeIndex = Math.min(layout.nextDateRow - 2, values.length - 1);
+  (hackValues || []).forEach(row => {
+    const weekCell = (row || []).map(value => String(value || "").trim()).find(value => /^Week of\s+/i.test(value));
+    if (weekCell) {
+      weekStart = parseWinterWeekHeading_(weekCell, seasonStartYear);
+      return;
+    }
+    if (!weekStart) return;
 
-    values[dateIndex].forEach((rawDate, dateColumn) => {
-      const parsedDate = parseFallMasterDate_(rawDate);
-      if (!parsedDate) return;
+    const time = String((row || [])[0] || "").trim();
+    if (!/^\d{1,2}(?::\d{2})?\s*(?:am|pm)\s*-\s*\d{1,2}(?::\d{2})?\s*(?:am|pm)$/i.test(time)) return;
 
-      const fieldStart = dateColumn - 3;
-      const timeColumn = fieldStart - 1;
-      if (fieldStart < 0 || timeColumn < 0) return;
+    for (let dayOffset = 0; dayOffset < 7; dayOffset += 1) {
+      splitWinterTeamCell_((row || [])[dayOffset + 1]).forEach(teamEntry => {
+        const date = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + dayOffset);
+        const details = winterPracticeDateDetails_(date);
+        const key = [details.iso, time, "Hack Shack", teamEntry.team].join("|");
+        if (seen[key]) return;
+        seen[key] = true;
+        teams[teamEntry.team] = true;
+        practices.push({
+          date: details.iso,
+          displayDate: details.display,
+          day: details.day,
+          month: details.month,
+          time: time,
+          location: "Hack Shack",
+          team: teamEntry.team,
+          allTeams: false,
+          tentative: teamEntry.tentative,
+          sourceTab: WINTER_HACK_SHACK_TAB
+        });
+      });
+    }
+  });
 
-      for (let row = firstTimeIndex; row <= lastTimeIndex; row += 1) {
-        const time = String(values[row][timeColumn] || "").trim();
-        if (!time) continue;
-
-        for (let fieldOffset = 0; fieldOffset < 8; fieldOffset += 1) {
-          const rawTeam = String(values[row][fieldStart + fieldOffset] || "").trim();
-          const team = rawTeam.toUpperCase();
-          if (!allowedTeams[team]) continue;
-
-          const fieldLabel = String(values[fieldIndex][fieldStart + fieldOffset] || (fieldOffset + 1)).trim();
-          const key = [parsedDate.iso, time, fieldLabel, team].join("|");
-          if (seen[key]) continue;
-          seen[key] = true;
-
-          practices.push({
-            date: parsedDate.iso,
-            displayDate: parsedDate.display,
-            day: parsedDate.day,
-            month: parsedDate.month,
-            time: time,
-            field: fieldLabel,
-            team: team
-          });
-        }
-      }
+  (fieldValues || []).slice(1).forEach(row => {
+    const date = parseWinterFieldHouseDate_((row || [])[0]);
+    const time = String((row || [])[1] || "").trim();
+    if (!date || !time) return;
+    const details = winterPracticeDateDetails_(date);
+    const key = [details.iso, time, "Field House", "All Teams"].join("|");
+    if (seen[key]) return;
+    seen[key] = true;
+    practices.push({
+      date: details.iso,
+      displayDate: details.display,
+      day: details.day,
+      month: details.month,
+      time: time,
+      location: "Field House",
+      team: "All Teams",
+      allTeams: true,
+      tentative: false,
+      sourceTab: WINTER_FIELD_HOUSE_TAB
     });
   });
 
@@ -1556,16 +1577,61 @@ function buildFallPracticeSchedule_() {
     if (byDate) return byDate;
     const byTime = practiceTimeSortValue_(a.time) - practiceTimeSortValue_(b.time);
     if (byTime) return byTime;
-    return Number(a.field) - Number(b.field) || a.team.localeCompare(b.team);
+    return a.location.localeCompare(b.location) || a.team.localeCompare(b.team);
+  });
+
+  const months = [];
+  practices.forEach(item => {
+    if (months.indexOf(item.month) < 0) months.push(item.month);
   });
 
   return {
-    sourceTitle: source.getName(),
-    sourceTab: FALL_PRACTICE_SOURCE_TAB,
-    readOnly: true,
-    refreshedAt: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MMM d, yyyy h:mm a"),
-    teams: FALL_PRACTICE_TEAMS,
+    teams: Object.keys(teams).sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
+    months: months,
     practices: practices
+  };
+}
+
+function parseWinterWeekHeading_(value, seasonStartYear) {
+  const monthNames = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
+  const match = String(value || "").trim().match(/^Week of\s+([A-Za-z]{3,9})\s+(\d{1,2})(?:,?\s+(\d{4}))?$/i);
+  if (!match) return null;
+  const month = monthNames[match[1].slice(0, 3).toLowerCase()];
+  if (month == null) return null;
+  const year = Number(match[3] || (month >= 6 ? seasonStartYear : Number(seasonStartYear) + 1));
+  const day = Number(match[2]);
+  const date = new Date(year, month, day);
+  return date.getFullYear() === year && date.getMonth() === month && date.getDate() === day ? date : null;
+}
+
+function parseWinterFieldHouseDate_(value) {
+  if (value instanceof Date && !isNaN(value.getTime())) {
+    return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+  }
+  const match = String(value || "").trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (!match) return null;
+  let year = Number(match[3]);
+  if (year < 100) year += 2000;
+  const month = Number(match[1]) - 1;
+  const day = Number(match[2]);
+  const date = new Date(year, month, day);
+  return date.getFullYear() === year && date.getMonth() === month && date.getDate() === day ? date : null;
+}
+
+function splitWinterTeamCell_(value) {
+  return String(value || "").split(/[\n,;]+/).map(raw => {
+    const trimmed = raw.trim();
+    const tentative = /\?\s*$/.test(trimmed);
+    return { team: trimmed.replace(/\?\s*$/, "").replace(/\s+/g, " "), tentative: tentative };
+  }).filter(item => item.team);
+}
+
+function winterPracticeDateDetails_(date) {
+  return {
+    iso: Utilities.formatDate(date, Session.getScriptTimeZone(), "yyyy-MM-dd"),
+    display: Utilities.formatDate(date, Session.getScriptTimeZone(), "MMM d"),
+    day: Utilities.formatDate(date, Session.getScriptTimeZone(), "EEE"),
+    month: Utilities.formatDate(date, Session.getScriptTimeZone(), "MMMM")
   };
 }
 
@@ -1626,7 +1692,7 @@ function parseFallMasterDate_(value) {
 }
 
 function practiceTimeSortValue_(value) {
-  const match = String(value || "").trim().match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?$/i);
+  const match = String(value || "").trim().match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?/i);
   if (!match) return 9999;
   let hour = Number(match[1]);
   const minute = Number(match[2] || 0);

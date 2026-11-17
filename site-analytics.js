@@ -11,7 +11,7 @@
 
   function pageLabel(){
     if(path.endsWith("/drills.html")) return "Drills";
-    if(path.endsWith("/fall-practice.html")) return "Fall Practice";
+    if(path.endsWith("/winter-practice.html") || path.endsWith("/fall-practice.html")) return "Winter Practices";
     if(path.endsWith("/index.html") || path.endsWith("/")) return "Pitch Log";
     return document.title || "Coach Page";
   }

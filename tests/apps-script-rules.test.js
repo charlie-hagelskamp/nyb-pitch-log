@@ -21,6 +21,9 @@ const context = {
       const month = String(date.getMonth() + 1).padStart(2,"0");
       const day = String(date.getDate()).padStart(2,"0");
       if(pattern === "yyyy-MM-dd") return `${year}-${month}-${day}`;
+      if(pattern === "MMM d") return `${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][date.getMonth()]} ${date.getDate()}`;
+      if(pattern === "EEE") return ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][date.getDay()];
+      if(pattern === "MMMM") return ["January","February","March","April","May","June","July","August","September","October","November","December"][date.getMonth()];
       if(pattern === "h:mm a"){
         const hour = date.getHours();
         return `${hour % 12 || 12}:${String(date.getMinutes()).padStart(2,"0")} ${hour >= 12 ? "PM" : "AM"}`;
@@ -91,6 +94,34 @@ test("Apps Script reads drills from the Drills tab",()=>{
   assert.equal(drills.length,1);
   assert.equal(drills[0].title,"Infield EveryDays");
   assert.equal(drills[0].source,"YouTube");
+});
+
+test("winter practices combine team Hack Shack slots with all-team Field House sessions",()=>{
+  const hackShack = [
+    [],
+    ["","","","Week of Nov 30"],
+    ["","Mon","Tue","Wed","Thu","Fri","Sat","Sun"],
+    ["5pm-6pm","","7U Black"],
+    ["6pm-7pm","10U Gold","10U Black"],
+    ["7pm-8pm","12U Gold?","","12U Gold?"]
+  ];
+  const fieldHouse = [
+    ["Date","Time"],
+    ["1/8/2027","5:00pm-7:00pm"],
+    ["1/15/2027","5:00pm-7:00pm"]
+  ];
+
+  const schedule = context.buildWinterPracticeScheduleFromValues_(hackShack,fieldHouse,2026);
+  assert.deepEqual(JSON.parse(JSON.stringify(schedule.teams)),["7U Black","10U Black","10U Gold","12U Gold"]);
+  assert.equal(schedule.practices.length,7);
+  assert.equal(schedule.practices[0].date,"2026-11-30");
+  assert.equal(schedule.practices[0].team,"10U Gold");
+  assert.equal(schedule.practices[1].team,"12U Gold");
+  assert.equal(schedule.practices[1].tentative,true);
+  assert.equal(schedule.practices[2].team,"7U Black");
+  assert.equal(schedule.practices[5].location,"Field House");
+  assert.equal(schedule.practices[5].allTeams,true);
+  assert.deepEqual(JSON.parse(JSON.stringify(schedule.months)),["November","December","January"]);
 });
 
 test("Apps Script summarizes anonymous traffic by rolling windows",()=>{

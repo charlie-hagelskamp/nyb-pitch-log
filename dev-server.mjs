@@ -120,7 +120,7 @@ function mockTrafficSummary(){
     topPages:[
       {label:"Pitch Log",views:79,sessions:51},
       {label:"Drills",views:29,sessions:18},
-      {label:"Fall Practice",views:18,sessions:13}
+      {label:"Winter Practices",views:18,sessions:13}
     ],
     devices:[{label:"Mobile",count:88},{label:"Desktop",count:31},{label:"Tablet",count:7}],
     browsers:[{label:"Safari",count:72},{label:"Chrome",count:45},{label:"Edge",count:9}],
@@ -147,6 +147,25 @@ function mockTeamNotes(team){
     lastSynced:lastSynced.toLocaleString(),
     summary:{wins:1,losses:1,ties:0,completedGames:2,runsScored:10,runsAllowed:9,missingNotes:1},
     games
+  };
+}
+
+function mockWinterPractices(){
+  return {
+    sourceTitle:"26/27 Hack Shack Times",
+    sourceTabs:["Hack Shack","Field House"],
+    readOnly:true,
+    refreshedAt:new Date().toLocaleString(),
+    teams:["7U Black","9B","10U Black","10U Gold","12U Gold"],
+    months:["November","December","January","February","March"],
+    practices:[
+      {date:"2026-11-30",displayDate:"Nov 30",day:"Mon",month:"November",time:"6pm-7pm",location:"Hack Shack",team:"10U Gold",allTeams:false,tentative:false,sourceTab:"Hack Shack"},
+      {date:"2026-12-01",displayDate:"Dec 1",day:"Tue",month:"December",time:"5pm-6pm",location:"Hack Shack",team:"7U Black",allTeams:false,tentative:false,sourceTab:"Hack Shack"},
+      {date:"2026-12-01",displayDate:"Dec 1",day:"Tue",month:"December",time:"6pm-7pm",location:"Hack Shack",team:"10U Black",allTeams:false,tentative:false,sourceTab:"Hack Shack"},
+      {date:"2026-12-03",displayDate:"Dec 3",day:"Thu",month:"December",time:"7pm-8pm",location:"Hack Shack",team:"12U Gold",allTeams:false,tentative:true,sourceTab:"Hack Shack"},
+      {date:"2027-01-08",displayDate:"Jan 8",day:"Fri",month:"January",time:"5:00pm-7:00pm",location:"Field House",team:"All Teams",allTeams:true,tentative:false,sourceTab:"Field House"},
+      {date:"2027-01-15",displayDate:"Jan 15",day:"Fri",month:"January",time:"5:00pm-7:00pm",location:"Field House",team:"All Teams",allTeams:true,tentative:false,sourceTab:"Field House"}
+    ]
   };
 }
 
@@ -216,6 +235,8 @@ async function handleApi(req,res,url){
     value = mockWeeklyReportPreview();
   }else if(url.searchParams.has("siteAnalyticsSummary")){
     value = mockTrafficSummary();
+  }else if(url.searchParams.has("winterPractices") || url.searchParams.has("fallPractices")){
+    value = mockWinterPractices();
   }else if(url.searchParams.has("drills")){
     value = JSON.parse(fs.readFileSync(path.join(root,"drills.json"),"utf8"));
   }else if(url.searchParams.has("gcGameCards")){
